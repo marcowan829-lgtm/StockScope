@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
+from plotly.subplots import make_subplots
 
 
 st.set_page_config(
@@ -621,7 +622,7 @@ def apply_market_layout(
 ) -> go.Figure:
     fig.update_layout(
         height=height,
-        margin=dict(l=8, r=64, t=8, b=8),
+        margin=dict(l=8, r=64, t=8, b=28),
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
         hovermode="x unified",
@@ -629,21 +630,21 @@ def apply_market_layout(
         font=dict(color="#131722", size=12, family="Trebuchet MS, Segoe UI, sans-serif"),
         xaxis_rangeslider_visible=False,
         spikedistance=-1,
-        yaxis=dict(
-            side="right",
-            showgrid=True,
-            gridcolor=GRID_COLOR,
-            zeroline=False,
-            linecolor="#ffffff",
-            tickfont=dict(color="#6a6d78", size=11),
-            separatethousands=True,
-            showspikes=True,
-            spikemode="across",
-            spikecolor=SPIKE_COLOR,
-            spikethickness=1,
-            spikedash="dot",
-            fixedrange=False,
-        ),
+    )
+    fig.update_yaxes(
+        side="right",
+        showgrid=True,
+        gridcolor=GRID_COLOR,
+        zeroline=False,
+        linecolor="#ffffff",
+        tickfont=dict(color="#6a6d78", size=11),
+        separatethousands=True,
+        showspikes=True,
+        spikemode="across",
+        spikecolor=SPIKE_COLOR,
+        spikethickness=1,
+        spikedash="dot",
+        fixedrange=False,
     )
     xaxis_kwargs: dict = dict(
         showgrid=False,
@@ -699,7 +700,17 @@ def build_price_chart(
 
     x = frame.index
     name = display_symbol(ticker)
-    fig = go.Figure()
+    # Separate price and volume panes so candles never sit on the volume bars.
+    if has_volume:
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.08,
+            row_heights=[0.82, 0.18],
+        )
+    else:
+        fig = make_subplots(rows=1, cols=1)
 
     if kind == "Candle":
         fig.add_trace(go.Candlestick(
@@ -710,7 +721,7 @@ def build_price_chart(
             decreasing=dict(line=dict(color=DOWN_COLOR, width=1), fillcolor=DOWN_COLOR),
             whiskerwidth=0.8,
             hoverinfo="x+y",
-        ))
+        ), row=1, col=1)
     elif kind == "Area":
         fig.add_trace(go.Scatter(
             x=x,
@@ -721,7 +732,7 @@ def build_price_chart(
             fill="tozeroy",
             fillcolor=AREA_FILL_UP if up else AREA_FILL_DOWN,
             hovertemplate="Close: %{y:,.2f}<extra></extra>",
-        ))
+        ), row=1, col=1)
     elif kind == "Baseline":
         baseline = float(ref)
         base_arr = [baseline] * len(close)
@@ -731,38 +742,38 @@ def build_price_chart(
             x=x, y=base_arr, mode="lines",
             line=dict(width=0, color="rgba(0,0,0,0)"),
             hoverinfo="skip", showlegend=False,
-        ))
+        ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=x, y=above, mode="lines",
             line=dict(width=0, color="rgba(0,0,0,0)"),
             fill="tonexty", fillcolor=AREA_FILL_UP,
             hoverinfo="skip", showlegend=False,
-        ))
+        ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=x, y=base_arr, mode="lines",
             line=dict(width=0, color="rgba(0,0,0,0)"),
             hoverinfo="skip", showlegend=False,
-        ))
+        ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=x, y=below, mode="lines",
             line=dict(width=0, color="rgba(0,0,0,0)"),
             fill="tonexty", fillcolor=AREA_FILL_DOWN,
             hoverinfo="skip", showlegend=False,
-        ))
+        ), row=1, col=1)
         x_hi, y_hi, x_lo, y_lo = _split_at_baseline(x, close, baseline)
         fig.add_trace(go.Scatter(
             x=x_hi, y=y_hi, mode="lines", name=name,
             line=dict(color=UP_COLOR, width=1.6, shape="linear"),
             connectgaps=False,
             hovertemplate="Close: %{y:,.2f}<extra></extra>",
-        ))
+        ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=x_lo, y=y_lo, mode="lines", name=name,
             line=dict(color=DOWN_COLOR, width=1.6, shape="linear"),
             connectgaps=False,
             hovertemplate="Close: %{y:,.2f}<extra></extra>",
-        ))
-        fig.add_hline(y=baseline, line_color=PREV_CLOSE_COLOR, line_width=1)
+        ), row=1, col=1)
+        fig.add_hline(y=baseline, line_color=PREV_CLOSE_COLOR, line_width=1, row=1, col=1)
     else:
         fig.add_trace(go.Scatter(
             x=x,
@@ -771,40 +782,25 @@ def build_price_chart(
             name=name,
             line=dict(color=line_color, width=1.6, shape="linear"),
             hovertemplate="Close: %{y:,.2f}<extra></extra>",
-        ))
+        ), row=1, col=1)
 
     if has_volume:
-        vmax = float(pd.to_numeric(frame["Volume"], errors="coerce").max() or 0)
         fig.add_trace(go.Bar(
             x=x,
             y=frame["Volume"],
             name="Volume",
-            yaxis="y2",
             marker_color=volume_bar_colors(frame),
             marker_line_width=0,
             opacity=0.9,
             hovertemplate="Volume: %{y:,.0f}<extra></extra>",
-        ))
-        fig.update_layout(
-            yaxis2=dict(
-                overlaying="y",
-                side="left",
-                range=[0, vmax * 7 if vmax > 0 else 1],
-                showgrid=False,
-                showticklabels=False,
-                showspikes=False,
-                zeroline=False,
-                fixedrange=True,
-                title=None,
-            ),
-        )
+        ), row=2, col=1)
 
     ymin = float(close.min())
     ymax = float(close.max())
     if kind == "Baseline":
         ymin = min(ymin, float(ref))
         ymax = max(ymax, float(ref))
-    pad = (ymax - ymin) * 0.06 if ymax > ymin else max(abs(ymin) * 0.01, 0.5)
+    pad = (ymax - ymin) * 0.08 if ymax > ymin else max(abs(ymin) * 0.01, 0.5)
 
     if range_key == "1D":
         tickformat = "%I:%M %p"
@@ -815,11 +811,22 @@ def build_price_chart(
 
     apply_market_layout(
         fig,
-        height=460,
+        height=500,
         tickformat=tickformat,
         rangebreaks=market_rangebreaks(pd.DatetimeIndex(x), range_key),
     )
-    fig.update_layout(yaxis=dict(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text=""))
+    fig.update_yaxes(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text="", row=1, col=1)
+    if has_volume:
+        fig.update_xaxes(showticklabels=False, row=1, col=1)
+        fig.update_yaxes(
+            title_text="",
+            showticklabels=False,
+            showgrid=False,
+            showspikes=False,
+            zeroline=False,
+            row=2,
+            col=1,
+        )
     if range_key == "1D":
         fig.update_xaxes(dtick=3_600_000)
     return fig
