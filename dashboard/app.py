@@ -10,7 +10,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
-from plotly.subplots import make_subplots
 
 
 st.set_page_config(
@@ -26,7 +25,6 @@ LEARN_TABS = ["Start here", "Data & methods"]
 UP_COLOR = "#089981"
 DOWN_COLOR = "#f23645"
 PREV_CLOSE_COLOR = "#787b86"
-LAST_LINE_COLOR = "#2962ff"
 GRID_COLOR = "#f0f3fa"
 SPIKE_COLOR = "#9598a1"
 
@@ -38,6 +36,15 @@ CHART_RANGES = {
     "1Y": {"period": "1y", "interval": "1d"},
     "All Time": {"period": "max", "interval": "1wk"},
 }
+CHART_TYPES = ["Line", "Candle", "Area", "Baseline"]
+INTRADAY_RANGES = {"1D", "5D"}
+ET_ZONE = "America/New_York"
+SESSION_OPEN_HOUR = 9.5
+SESSION_CLOSE_HOUR = 16.0
+SESSION_OPEN_MIN = 9 * 60 + 30
+SESSION_CLOSE_MIN = 16 * 60
+AREA_FILL_UP = "rgba(8,153,129,0.28)"
+AREA_FILL_DOWN = "rgba(242,54,69,0.22)"
 PERIOD_LABELS = {
     "1mo": "1 month",
     "3mo": "3 months",
@@ -221,6 +228,11 @@ APP_STYLE = """
     min-height: 2rem !important;
     padding: 0.15rem 0.5rem !important;
     border-radius: 8px !important;
+  }
+  div.st-key-chart_type button {
+    font-size: 0.8rem !important;
+    padding: 0.15rem 0.45rem !important;
+    min-height: 2rem !important;
   }
   @media (max-width: 900px) {
     .index-grid { grid-template-columns: 1fr; }
@@ -540,7 +552,79 @@ def volume_bar_colors(frame: pd.DataFrame) -> list[str]:
     return [UP_COLOR if pd.isna(p) or c >= p else DOWN_COLOR for c, p in zip(closes, prev)]
 
 
-def apply_market_layout(fig: go.Figure, *, height: int, tickformat: str) -> go.Figure:
+def to_et_naive(index: pd.Index) -> pd.DatetimeIndex:
+    idx = pd.DatetimeIndex(index)
+    if idx.tz is not None:
+        return idx.tz_convert(ET_ZONE).tz_localize(None)
+    return idx
+
+
+def clip_regular_session(frame: pd.DataFrame, range_key: str) -> pd.DataFrame:
+    """Keep regular US-session bars so Plotly never plots overnight or weekend prints."""
+    out = frame.copy()
+    out.index = to_et_naive(out.index)
+    weekday = out.index.day_of_week < 5
+    if range_key in INTRADAY_RANGES:
+        minutes = out.index.hour * 60 + out.index.minute
+        session = (minutes >= SESSION_OPEN_MIN) & (minutes <= SESSION_CLOSE_MIN)
+        return out.loc[weekday & session]
+    return out.loc[weekday]
+
+
+def market_rangebreaks(index: pd.DatetimeIndex, range_key: str) -> list[dict]:
+    """Collapse weekends, US overnight hours, and weekday holidays on the time axis."""
+    breaks: list[dict] = [dict(bounds=["sat", "mon"])]
+    if range_key in INTRADAY_RANGES:
+        breaks.append(dict(bounds=[SESSION_CLOSE_HOUR, SESSION_OPEN_HOUR], pattern="hour"))
+    if len(index) >= 2:
+        idx = pd.DatetimeIndex(index)
+        start, end = idx.min().normalize(), idx.max().normalize()
+        have = {pd.Timestamp(d).normalize() for d in idx}
+        missing = [d for d in pd.bdate_range(start, end) if d not in have]
+        if missing:
+            breaks.append(dict(values=missing))
+    return breaks
+
+
+def _split_at_baseline(index, values, level: float):
+    """Split a series at `level` so the line can be green above and red below."""
+    xs = list(index)
+    ys = [float(v) for v in values]
+    x_hi: list = []
+    y_hi: list = []
+    x_lo: list = []
+    y_lo: list = []
+    for i, (x, y) in enumerate(zip(xs, ys)):
+        if i > 0:
+            y_prev = ys[i - 1]
+            if (y_prev - level) * (y - level) < 0 and y != y_prev:
+                x_prev = xs[i - 1]
+                t = (level - y_prev) / (y - y_prev)
+                x_cross = x_prev + (x - x_prev) * t
+                x_hi.append(x_cross)
+                y_hi.append(level)
+                x_lo.append(x_cross)
+                y_lo.append(level)
+        if y >= level:
+            x_hi.append(x)
+            y_hi.append(y)
+            x_lo.append(None)
+            y_lo.append(None)
+        else:
+            x_lo.append(x)
+            y_lo.append(y)
+            x_hi.append(None)
+            y_hi.append(None)
+    return x_hi, y_hi, x_lo, y_lo
+
+
+def apply_market_layout(
+    fig: go.Figure,
+    *,
+    height: int,
+    tickformat: str,
+    rangebreaks: list[dict] | None = None,
+) -> go.Figure:
     fig.update_layout(
         height=height,
         margin=dict(l=8, r=64, t=8, b=8),
@@ -551,8 +635,23 @@ def apply_market_layout(fig: go.Figure, *, height: int, tickformat: str) -> go.F
         font=dict(color="#131722", size=12, family="Trebuchet MS, Segoe UI, sans-serif"),
         xaxis_rangeslider_visible=False,
         spikedistance=-1,
+        yaxis=dict(
+            side="right",
+            showgrid=True,
+            gridcolor=GRID_COLOR,
+            zeroline=False,
+            linecolor="#ffffff",
+            tickfont=dict(color="#6a6d78", size=11),
+            separatethousands=True,
+            showspikes=True,
+            spikemode="across",
+            spikecolor=SPIKE_COLOR,
+            spikethickness=1,
+            spikedash="dot",
+            fixedrange=False,
+        ),
     )
-    fig.update_xaxes(
+    xaxis_kwargs: dict = dict(
         showgrid=False,
         linecolor="#e0e3eb",
         tickfont=dict(color="#6a6d78", size=11),
@@ -564,22 +663,11 @@ def apply_market_layout(fig: go.Figure, *, height: int, tickformat: str) -> go.F
         spikethickness=1,
         spikedash="dot",
         rangeslider_visible=False,
+        title_text="",
     )
-    fig.update_yaxes(
-        side="right",
-        showgrid=True,
-        gridcolor=GRID_COLOR,
-        zeroline=False,
-        linecolor="#ffffff",
-        tickfont=dict(color="#6a6d78", size=11),
-        separatethousands=True,
-        showspikes=True,
-        spikemode="across",
-        spikecolor=SPIKE_COLOR,
-        spikethickness=1,
-        spikedash="dot",
-        fixedrange=False,
-    )
+    if rangebreaks:
+        xaxis_kwargs["rangebreaks"] = rangebreaks
+    fig.update_xaxes(**xaxis_kwargs)
     return fig
 
 
@@ -595,10 +683,16 @@ def build_price_chart(
     previous_close: float | None = None,
     range_key: str = "1D",
 ) -> go.Figure:
-    """Price + volume panel in the layout used by Yahoo / TradingView."""
+    """Quote-site price pane: Line / Candle / Area / Baseline, regular hours only."""
+    empty_ticks = "%I:%M %p" if range_key == "1D" else "%b %d"
     if frame.empty:
-        return apply_market_layout(go.Figure(), height=460, tickformat="%H:%M")
+        return apply_market_layout(go.Figure(), height=460, tickformat=empty_ticks)
 
+    frame = clip_regular_session(frame, range_key)
+    if frame.empty:
+        return apply_market_layout(go.Figure(), height=460, tickformat=empty_ticks)
+
+    kind = chart_type if chart_type in CHART_TYPES else "Line"
     close = frame["Close"].astype(float)
     last = float(close.iloc[-1])
     ref = previous_close if previous_close is not None and pd.notna(previous_close) else float(close.iloc[0])
@@ -606,77 +700,134 @@ def build_price_chart(
     line_color = UP_COLOR if up else DOWN_COLOR
     has_ohlc = {"Open", "High", "Low", "Close"}.issubset(frame.columns)
     has_volume = "Volume" in frame.columns and frame["Volume"].notna().any()
-    use_candle = chart_type == "Candle" and has_ohlc
+    if kind == "Candle" and not has_ohlc:
+        kind = "Line"
 
-    if has_volume:
-        fig = make_subplots(
-            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.04,
-            row_heights=[0.74, 0.26],
-        )
-    else:
-        fig = make_subplots(rows=1, cols=1)
+    x = frame.index
+    name = display_symbol(ticker)
+    fig = go.Figure()
 
-    if use_candle:
+    if kind == "Candle":
         fig.add_trace(go.Candlestick(
-            x=frame.index,
+            x=x,
             open=frame["Open"], high=frame["High"], low=frame["Low"], close=frame["Close"],
-            name=display_symbol(ticker),
+            name=name,
             increasing=dict(line=dict(color=UP_COLOR, width=1), fillcolor=UP_COLOR),
             decreasing=dict(line=dict(color=DOWN_COLOR, width=1), fillcolor=DOWN_COLOR),
             whiskerwidth=0.8,
             hoverinfo="x+y",
-        ), row=1, col=1)
-    else:
+        ))
+    elif kind == "Area":
         fig.add_trace(go.Scatter(
-            x=frame.index,
+            x=x,
             y=close,
             mode="lines",
-            name=display_symbol(ticker),
+            name=name,
+            line=dict(color=line_color, width=1.6, shape="linear"),
+            fill="tozeroy",
+            fillcolor=AREA_FILL_UP if up else AREA_FILL_DOWN,
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ))
+    elif kind == "Baseline":
+        baseline = float(ref)
+        base_arr = [baseline] * len(close)
+        above = close.clip(lower=baseline)
+        below = close.clip(upper=baseline)
+        fig.add_trace(go.Scatter(
+            x=x, y=base_arr, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            hoverinfo="skip", showlegend=False,
+        ))
+        fig.add_trace(go.Scatter(
+            x=x, y=above, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            fill="tonexty", fillcolor=AREA_FILL_UP,
+            hoverinfo="skip", showlegend=False,
+        ))
+        fig.add_trace(go.Scatter(
+            x=x, y=base_arr, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            hoverinfo="skip", showlegend=False,
+        ))
+        fig.add_trace(go.Scatter(
+            x=x, y=below, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            fill="tonexty", fillcolor=AREA_FILL_DOWN,
+            hoverinfo="skip", showlegend=False,
+        ))
+        x_hi, y_hi, x_lo, y_lo = _split_at_baseline(x, close, baseline)
+        fig.add_trace(go.Scatter(
+            x=x_hi, y=y_hi, mode="lines", name=name,
+            line=dict(color=UP_COLOR, width=1.6, shape="linear"),
+            connectgaps=False,
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ))
+        fig.add_trace(go.Scatter(
+            x=x_lo, y=y_lo, mode="lines", name=name,
+            line=dict(color=DOWN_COLOR, width=1.6, shape="linear"),
+            connectgaps=False,
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ))
+        fig.add_hline(y=baseline, line_color=PREV_CLOSE_COLOR, line_width=1)
+    else:
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=close,
+            mode="lines",
+            name=name,
             line=dict(color=line_color, width=1.6, shape="linear"),
             hovertemplate="Close: %{y:,.2f}<extra></extra>",
-        ), row=1, col=1)
+        ))
 
     if has_volume:
+        vmax = float(pd.to_numeric(frame["Volume"], errors="coerce").max() or 0)
         fig.add_trace(go.Bar(
-            x=frame.index,
+            x=x,
             y=frame["Volume"],
             name="Volume",
+            yaxis="y2",
             marker_color=volume_bar_colors(frame),
             marker_line_width=0,
+            opacity=0.9,
             hovertemplate="Volume: %{y:,.0f}<extra></extra>",
-        ), row=2, col=1)
-        fig.update_yaxes(title_text="", tickformat="~s", row=2, col=1)
+        ))
+        fig.update_layout(
+            yaxis2=dict(
+                overlaying="y",
+                side="left",
+                range=[0, vmax * 7 if vmax > 0 else 1],
+                showgrid=False,
+                showticklabels=False,
+                showspikes=False,
+                zeroline=False,
+                fixedrange=True,
+                title=None,
+            ),
+        )
 
     ymin = float(close.min())
     ymax = float(close.max())
-    if previous_close is not None and pd.notna(previous_close):
-        ymin = min(ymin, float(previous_close))
-        ymax = max(ymax, float(previous_close))
+    if kind == "Baseline":
+        ymin = min(ymin, float(ref))
+        ymax = max(ymax, float(ref))
     pad = (ymax - ymin) * 0.06 if ymax > ymin else max(abs(ymin) * 0.01, 0.5)
-    fig.update_yaxes(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text="", row=1, col=1)
-
-    if previous_close is not None and pd.notna(previous_close):
-        fig.add_hline(
-            y=float(previous_close), line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1,
-            annotation_text="Prev close", annotation_position="top left",
-            annotation_font=dict(size=10, color=PREV_CLOSE_COLOR),
-            row=1, col=1,
-        )
-    fig.add_hline(
-        y=last, line_dash="dash", line_color=LAST_LINE_COLOR, line_width=1,
-        annotation_text=f"{last:,.2f}", annotation_position="top right",
-        annotation_font=dict(size=10, color=LAST_LINE_COLOR),
-        row=1, col=1,
-    )
 
     if range_key == "1D":
-        tickformat = "%H:%M"
+        tickformat = "%I:%M %p"
     elif range_key == "5D":
-        tickformat = "%b %d %H:%M"
+        tickformat = "%b %d"
     else:
         tickformat = "%b %d"
-    apply_market_layout(fig, height=520 if has_volume else 430, tickformat=tickformat)
-    fig.update_xaxes(title_text="", row=(2 if has_volume else 1), col=1)
+
+    apply_market_layout(
+        fig,
+        height=460,
+        tickformat=tickformat,
+        rangebreaks=market_rangebreaks(pd.DatetimeIndex(x), range_key),
+    )
+    fig.update_layout(yaxis=dict(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text=""))
+    if range_key == "1D":
+        fig.update_xaxes(dtick=3_600_000)
     return fig
 
 
@@ -808,9 +959,13 @@ def init_state() -> None:
     st.session_state.setdefault("selected_symbol", "AAPL")
     st.session_state.setdefault("chart_range_persist", "1D")
     st.session_state.setdefault("chart_type_persist", "Line")
+    if st.session_state.chart_type_persist not in CHART_TYPES:
+        st.session_state.chart_type_persist = "Line"
     if "chart_range" not in st.session_state:
         st.session_state.chart_range = st.session_state.chart_range_persist
     if "chart_type" not in st.session_state:
+        st.session_state.chart_type = st.session_state.chart_type_persist
+    if st.session_state.get("chart_type") not in CHART_TYPES:
         st.session_state.chart_type = st.session_state.chart_type_persist
     st.session_state.setdefault("watchlist", ["AAPL", "MCD"])
     st.session_state.setdefault("search_result", {})
@@ -1018,7 +1173,7 @@ def render_home() -> None:
 
 def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
     quote = lookup_snapshot(snap, ticker)
-    title_l, type_col, help_col, add_col = st.columns([3.2, 1.45, 0.8, 0.9])
+    title_l, type_col, help_col, add_col = st.columns([2.05, 3.05, 0.7, 0.75])
     with title_l:
         st.markdown(
             f'<p class="quote-name">{html.escape(company_name(ticker))}'
@@ -1028,7 +1183,7 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
     with type_col:
         st.segmented_control(
             "Chart type",
-            options=["Line", "Candle"],
+            options=CHART_TYPES,
             key="chart_type",
             on_change=remember_chart_type,
         )
@@ -1036,11 +1191,14 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
         with st.popover("Help"):
             st.markdown(
                 """
-                **How to read this chart** (Yahoo / TradingView style)
-                - **Line** is last price only. **Candle** is open / high / low / close.
-                - The **blue dashed line** is the latest print. The **dotted line** is the previous session close.
-                - **Green / red volume** under the price is that bar's volume (green if close ≥ open).
-                - The **price scale is zoomed to this range**, not to zero — a small move can look tall. That is how live quote sites draw it.
+                **How to read this chart** (Microsoft Edge / MSN Money style)
+                - **Line** — last price only, no fill.
+                - **Candle** — open / high / low / close for each bar.
+                - **Area** — line with a fill down to the bottom of the pane (green if up vs previous close).
+                - **Baseline** — green above the baseline, red below. Baseline is the previous close when known, otherwise the first price in this range.
+                - **Nights, weekends, and US holidays are hidden**, so the line stays continuous instead of stretching across closed hours.
+                - Thin **green / red volume** sits at the bottom of the same pane.
+                - The **price scale is zoomed to this range**, not to zero — a small move can look tall.
                 - Header change is versus the **previous close**, not versus the left edge of the chart.
                 - Figures come from Yahoo Finance and may be delayed. This is not a trading terminal.
                 """
@@ -1091,10 +1249,11 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
             range_key=range_key,
         )
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
-        as_of = pd.Timestamp(series.index[-1])
+        as_of = to_new_york_time(series.index[-1])
         st.caption(
-            f"Range {range_key} · last bar {as_of}. Scale zoomed to this window (not $0). "
-            "Dotted = previous close · dashed = last · volume under price. Yahoo Finance / yfinance; may be delayed."
+            f"Range {range_key} · last bar {as_of.strftime('%Y-%m-%d %H:%M %Z')}. "
+            "Regular US hours only — nights, weekends, and holidays are hidden so the line stays continuous. "
+            "Yahoo Finance / yfinance; may be delayed."
         )
     if st.button("Open stock details"):
         go_to("Markets", markets_tab="Stock")
@@ -1425,7 +1584,7 @@ def render_stock_details() -> None:
             prev_close = last_px / (1 + float(m["Day chg (%)"]) / 100) if float(m["Day chg (%)"]) != -100 else None
         price_fig = build_price_chart(series, focus, "Candle", previous_close=prev_close, range_key="1Y")
         st.plotly_chart(price_fig, width="stretch", config={"displayModeBar": False})
-        st.caption("Candles are daily OHLC. Volume is under the price. Green = close ≥ open. Scale is zoomed to this window.")
+        st.caption("Daily OHLC candles. Weekends and holidays are hidden. Green = close ≥ open. Scale is zoomed to this window.")
 
     add_col, live_col = st.columns(2)
     if add_col.button("Add to watchlist", width="stretch"):
@@ -1566,8 +1725,8 @@ def render_live_quotes() -> None:
             live_fig = build_price_chart(valid, selected_symbol, "Candle", range_key="1D")
             st.plotly_chart(live_fig, width="stretch", config={"displayModeBar": False})
             st.caption(
-                "Intraday OHLC candles with volume underneath (green if that bar closed ≥ open). "
-                "This is a classroom feed, not an exchange plot."
+                "Intraday OHLC candles on regular US hours only (nights hidden). "
+                "Green = that bar closed ≥ open. This is a classroom feed, not an exchange plot."
             )
 
             with st.expander("Latest minute rows", expanded=False):
