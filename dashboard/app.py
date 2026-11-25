@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
+from plotly.subplots import make_subplots
 
 
 st.set_page_config(
@@ -22,6 +23,13 @@ st.set_page_config(
 TOP_NAV = ["Home", "Learn", "Markets", "Watchlist"]
 MARKET_TABS = ["Overview", "Screener", "Live quotes", "Returns & risk", "Stock"]
 LEARN_TABS = ["Start here", "Data & methods"]
+UP_COLOR = "#089981"
+DOWN_COLOR = "#f23645"
+PREV_CLOSE_COLOR = "#787b86"
+LAST_LINE_COLOR = "#2962ff"
+GRID_COLOR = "#f0f3fa"
+SPIKE_COLOR = "#9598a1"
+
 CHART_RANGES = {
     "1D": {"period": "1d", "interval": "5m"},
     "5D": {"period": "5d", "interval": "15m"},
@@ -512,7 +520,7 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
         hovertemplate="Group: %{y}<br>Month: %{x}<br>Avg return: %{z:.2f}%<extra></extra>",
     ))
     fig.update_layout(
-        title="Group monthly returns (equal-weighted inside each group)",
+        title="Group monthly returns (0% = unchanged · equal-weighted inside each group)",
         xaxis_title="Month",
         yaxis_title="Group",
         height=420,
@@ -523,72 +531,178 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def restyle_chart(fig: go.Figure, height: int = 420) -> go.Figure:
+def volume_bar_colors(frame: pd.DataFrame) -> list[str]:
+    closes = frame["Close"].astype(float)
+    if "Open" in frame.columns:
+        opens = frame["Open"].astype(float)
+        return [UP_COLOR if c >= o else DOWN_COLOR for o, c in zip(opens, closes)]
+    prev = closes.shift(1)
+    return [UP_COLOR if pd.isna(p) or c >= p else DOWN_COLOR for c, p in zip(closes, prev)]
+
+
+def apply_market_layout(fig: go.Figure, *, height: int, tickformat: str) -> go.Figure:
     fig.update_layout(
         height=height,
-        margin=dict(l=8, r=56, t=12, b=32),
+        margin=dict(l=8, r=64, t=8, b=8),
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
         hovermode="x unified",
         showlegend=False,
-        legend_title_text="",
-        font=dict(color="#131722", size=12),
+        font=dict(color="#131722", size=12, family="Trebuchet MS, Segoe UI, sans-serif"),
+        xaxis_rangeslider_visible=False,
+        spikedistance=-1,
     )
-    fig.update_xaxes(showgrid=False, linecolor="#e0e3eb", tickfont=dict(color="#6a6d78"))
+    fig.update_xaxes(
+        showgrid=False,
+        linecolor="#e0e3eb",
+        tickfont=dict(color="#6a6d78", size=11),
+        tickformat=tickformat,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor=SPIKE_COLOR,
+        spikethickness=1,
+        spikedash="dot",
+        rangeslider_visible=False,
+    )
     fig.update_yaxes(
         side="right",
         showgrid=True,
-        gridcolor="#f0f3fa",
-        linecolor="#ffffff",
-        tickfont=dict(color="#6a6d78"),
+        gridcolor=GRID_COLOR,
         zeroline=False,
+        linecolor="#ffffff",
+        tickfont=dict(color="#6a6d78", size=11),
+        separatethousands=True,
+        showspikes=True,
+        spikemode="across",
+        spikecolor=SPIKE_COLOR,
+        spikethickness=1,
+        spikedash="dot",
+        fixedrange=False,
     )
     return fig
 
 
-def build_price_chart(frame: pd.DataFrame, ticker: str, chart_type: str) -> go.Figure:
-    fig = go.Figure()
+def restyle_chart(fig: go.Figure, height: int = 420) -> go.Figure:
+    return apply_market_layout(fig, height=height, tickformat="%b %d")
+
+
+def build_price_chart(
+    frame: pd.DataFrame,
+    ticker: str,
+    chart_type: str,
+    *,
+    previous_close: float | None = None,
+    range_key: str = "1D",
+) -> go.Figure:
+    """Price + volume panel in the layout used by Yahoo / TradingView."""
     if frame.empty:
-        return restyle_chart(fig, 430)
-    y = frame["Close"].astype(float)
-    up = bool(y.iloc[-1] >= y.iloc[0]) if len(y) else True
-    line_color = "#089981" if up else "#f23645"
-    fill_color = "rgba(8,153,129,0.14)" if up else "rgba(242,54,69,0.12)"
-    if chart_type == "Candle" and {"Open", "High", "Low", "Close"}.issubset(frame.columns):
+        return apply_market_layout(go.Figure(), height=460, tickformat="%H:%M")
+
+    close = frame["Close"].astype(float)
+    last = float(close.iloc[-1])
+    ref = previous_close if previous_close is not None and pd.notna(previous_close) else float(close.iloc[0])
+    up = last >= ref
+    line_color = UP_COLOR if up else DOWN_COLOR
+    has_ohlc = {"Open", "High", "Low", "Close"}.issubset(frame.columns)
+    has_volume = "Volume" in frame.columns and frame["Volume"].notna().any()
+    use_candle = chart_type == "Candle" and has_ohlc
+
+    if has_volume:
+        fig = make_subplots(
+            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.04,
+            row_heights=[0.74, 0.26],
+        )
+    else:
+        fig = make_subplots(rows=1, cols=1)
+
+    if use_candle:
         fig.add_trace(go.Candlestick(
             x=frame.index,
-            open=frame["Open"],
-            high=frame["High"],
-            low=frame["Low"],
-            close=frame["Close"],
+            open=frame["Open"], high=frame["High"], low=frame["Low"], close=frame["Close"],
             name=display_symbol(ticker),
-            increasing_line_color="#089981",
-            decreasing_line_color="#f23645",
-        ))
-        fig.update_layout(xaxis_rangeslider_visible=False)
+            increasing=dict(line=dict(color=UP_COLOR, width=1), fillcolor=UP_COLOR),
+            decreasing=dict(line=dict(color=DOWN_COLOR, width=1), fillcolor=DOWN_COLOR),
+            whiskerwidth=0.8,
+            hoverinfo="x+y",
+        ), row=1, col=1)
     else:
-        ymin = float(y.min())
-        ymax = float(y.max())
-        pad = (ymax - ymin) * 0.08 if ymax > ymin else abs(ymin) * 0.01 or 1
-        fig.add_trace(go.Scatter(
-            x=frame.index, y=[ymin - pad] * len(frame),
-            mode="lines",
-            line=dict(width=0, color=fill_color),
-            hoverinfo="skip", showlegend=False,
-        ))
         fig.add_trace(go.Scatter(
             x=frame.index,
-            y=y,
+            y=close,
             mode="lines",
             name=display_symbol(ticker),
-            line=dict(color=line_color, width=2.2),
-            fill="tonexty",
-            fillcolor=fill_color,
-        ))
-        fig.update_yaxes(range=[ymin - pad, ymax + pad])
-    unit = INDEX_META[ticker]["unit"].upper() if is_index(ticker) else "USD"
-    fig.update_yaxes(title=unit)
-    return restyle_chart(fig, 430)
+            line=dict(color=line_color, width=1.6, shape="linear"),
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ), row=1, col=1)
+
+    if has_volume:
+        fig.add_trace(go.Bar(
+            x=frame.index,
+            y=frame["Volume"],
+            name="Volume",
+            marker_color=volume_bar_colors(frame),
+            marker_line_width=0,
+            hovertemplate="Volume: %{y:,.0f}<extra></extra>",
+        ), row=2, col=1)
+        fig.update_yaxes(title_text="", tickformat="~s", row=2, col=1)
+
+    ymin = float(close.min())
+    ymax = float(close.max())
+    if previous_close is not None and pd.notna(previous_close):
+        ymin = min(ymin, float(previous_close))
+        ymax = max(ymax, float(previous_close))
+    pad = (ymax - ymin) * 0.06 if ymax > ymin else max(abs(ymin) * 0.01, 0.5)
+    fig.update_yaxes(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text="", row=1, col=1)
+
+    if previous_close is not None and pd.notna(previous_close):
+        fig.add_hline(
+            y=float(previous_close), line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1,
+            annotation_text="Prev close", annotation_position="top left",
+            annotation_font=dict(size=10, color=PREV_CLOSE_COLOR),
+            row=1, col=1,
+        )
+    fig.add_hline(
+        y=last, line_dash="dash", line_color=LAST_LINE_COLOR, line_width=1,
+        annotation_text=f"{last:,.2f}", annotation_position="top right",
+        annotation_font=dict(size=10, color=LAST_LINE_COLOR),
+        row=1, col=1,
+    )
+
+    if range_key == "1D":
+        tickformat = "%H:%M"
+    elif range_key == "5D":
+        tickformat = "%b %d %H:%M"
+    else:
+        tickformat = "%b %d"
+    apply_market_layout(fig, height=520 if has_volume else 430, tickformat=tickformat)
+    fig.update_xaxes(title_text="", row=(2 if has_volume else 1), col=1)
+    return fig
+
+
+def signed_hbar(df: pd.DataFrame, x_col: str, y_col: str, title: str, x_title: str) -> go.Figure:
+    ordered = df.sort_values(x_col)
+    colors = [UP_COLOR if (pd.notna(v) and v >= 0) else DOWN_COLOR for v in ordered[x_col]]
+    fig = go.Figure(go.Bar(
+        x=ordered[x_col],
+        y=ordered[y_col],
+        orientation="h",
+        marker_color=colors,
+        marker_line_width=0,
+        hovertemplate="%{y}: %{x:+.2f}%<extra></extra>",
+    ))
+    fig.add_vline(x=0, line_color="#b2b5be", line_width=1)
+    fig.update_layout(
+        title=title, height=400, showlegend=False,
+        xaxis_title=x_title, yaxis_title="",
+        margin=dict(l=8, r=12, t=48, b=8),
+        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        font=dict(color="#131722", size=12),
+        bargap=0.28,
+    )
+    fig.update_xaxes(zeroline=True, zerolinecolor="#b2b5be", gridcolor=GRID_COLOR, ticksuffix="%")
+    fig.update_yaxes(showgrid=False)
+    return fig
 
 
 def lookup_snapshot(snap: pd.DataFrame, ticker: str) -> dict:
@@ -694,6 +808,10 @@ def init_state() -> None:
     st.session_state.setdefault("selected_symbol", "AAPL")
     st.session_state.setdefault("chart_range_persist", "1D")
     st.session_state.setdefault("chart_type_persist", "Line")
+    if "chart_range" not in st.session_state:
+        st.session_state.chart_range = st.session_state.chart_range_persist
+    if "chart_type" not in st.session_state:
+        st.session_state.chart_type = st.session_state.chart_type_persist
     st.session_state.setdefault("watchlist", ["AAPL", "MCD"])
     st.session_state.setdefault("search_result", {})
     st.session_state.setdefault("flash", "")
@@ -908,7 +1026,6 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
             unsafe_allow_html=True,
         )
     with type_col:
-        bind_widget("chart_type", "chart_type_persist", "Line")
         st.segmented_control(
             "Chart type",
             options=["Line", "Candle"],
@@ -919,11 +1036,13 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
         with st.popover("Help"):
             st.markdown(
                 """
-                **How to read this chart**
-                - **1D / 5D** use intraday bars; longer ranges use daily or weekly closes.
-                - The big number is the latest close Yahoo returned, not a guaranteed live print.
-                - Green means up versus the previous close; red means down.
-                - This dashboard is a class prototype, not trading software.
+                **How to read this chart** (Yahoo / TradingView style)
+                - **Line** is last price only. **Candle** is open / high / low / close.
+                - The **blue dashed line** is the latest print. The **dotted line** is the previous session close.
+                - **Green / red volume** under the price is that bar's volume (green if close ≥ open).
+                - The **price scale is zoomed to this range**, not to zero — a small move can look tall. That is how live quote sites draw it.
+                - Header change is versus the **previous close**, not versus the left edge of the chart.
+                - Figures come from Yahoo Finance and may be delayed. This is not a trading terminal.
                 """
             )
     with add_col:
@@ -944,7 +1063,6 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
         unsafe_allow_html=True,
     )
 
-    bind_widget("chart_range", "chart_range_persist", "1D")
     st.pills(
         "Range",
         list(CHART_RANGES.keys()),
@@ -962,14 +1080,22 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
     if series.empty:
         st.info("No bars for this range yet. Markets may be closed, or Yahoo did not return data.")
     else:
+        prev_close = None
+        if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")):
+            prev_close = float(quote["last"]) - float(quote["chg"])
         fig = build_price_chart(
             series,
             ticker,
             st.session_state.get("chart_type") or st.session_state.get("chart_type_persist") or "Line",
+            previous_close=prev_close,
+            range_key=range_key,
         )
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
         as_of = pd.Timestamp(series.index[-1])
-        st.caption(f"Range {range_key} · last bar {as_of} · data via Yahoo Finance / yfinance.")
+        st.caption(
+            f"Range {range_key} · last bar {as_of}. Scale zoomed to this window (not $0). "
+            "Dotted = previous close · dashed = last · volume under price. Yahoo Finance / yfinance; may be delayed."
+        )
     if st.button("Open stock details"):
         go_to("Markets", markets_tab="Stock")
         st.rerun()
@@ -1076,19 +1202,7 @@ def render_overview(
             st.info("Not enough history in this window to draw the monthly heatmap.")
     with right:
         ranked = metrics_view.sort_values("Period return (%)", ascending=False).head(15)
-        fig_rank = px.bar(
-            ranked.sort_values("Period return (%)"),
-            x="Period return (%)", y="Ticker", color="Period return (%)",
-            color_continuous_scale="RdYlGn", orientation="h",
-            hover_data={"Group": True, "Ann. volatility (%)": ":.2f", "Max drawdown (%)": ":.2f"},
-            title="Top 15 in this window",
-        )
-        fig_rank.update_layout(
-            height=420, coloraxis_showscale=False,
-            margin=dict(l=10, r=10, t=60, b=10),
-            yaxis_title="", xaxis_title="Period return (%)",
-            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-        )
+        fig_rank = signed_hbar(ranked, "Period return (%)", "Ticker", "Top 15 in this window", "Period return")
         st.plotly_chart(fig_rank, width="stretch", config={"displayModeBar": False})
 
     st.subheader("Today's movers in the starter list")
@@ -1107,19 +1221,7 @@ def render_overview(
         else:
             gainers = pd.DataFrame()
         if not gainers.empty:
-            fig_gainers = px.bar(
-                gainers.sort_values("Day chg (%)"),
-                x="Day chg (%)", y="Ticker", orientation="h",
-                color="Day chg (%)", color_continuous_scale="RdYlGn",
-                hover_data={"Company": True, "Last": ":.2f"},
-                title="Gainers · top 10",
-            )
-            fig_gainers.update_layout(
-                height=390, showlegend=False, coloraxis_showscale=False,
-                xaxis_title="Day change (%)", yaxis_title="",
-                margin=dict(l=5, r=5, t=55, b=5),
-                paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-            )
+            fig_gainers = signed_hbar(gainers, "Day chg (%)", "Ticker", "Gainers · top 10", "Day change")
             st.plotly_chart(fig_gainers, width="stretch", config={"displayModeBar": False})
         else:
             st.info("Not enough data for a gainer list.")
@@ -1129,19 +1231,7 @@ def render_overview(
         else:
             losers = pd.DataFrame()
         if not losers.empty:
-            fig_losers = px.bar(
-                losers.sort_values("Day chg (%)", ascending=False),
-                x="Day chg (%)", y="Ticker", orientation="h",
-                color="Day chg (%)", color_continuous_scale="RdYlGn",
-                hover_data={"Company": True, "Last": ":.2f"},
-                title="Losers · bottom 10",
-            )
-            fig_losers.update_layout(
-                height=390, showlegend=False, coloraxis_showscale=False,
-                xaxis_title="Day change (%)", yaxis_title="",
-                margin=dict(l=5, r=5, t=55, b=5),
-                paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-            )
+            fig_losers = signed_hbar(losers, "Day chg (%)", "Ticker", "Losers · bottom 10", "Day change")
             st.plotly_chart(fig_losers, width="stretch", config={"displayModeBar": False})
         else:
             st.info("Not enough data for a loser list.")
@@ -1149,19 +1239,23 @@ def render_overview(
     st.markdown("#### Volume leaders")
     volume_rank = stocks_only.dropna(subset=["Volume"]).nlargest(10, "Volume")
     if not volume_rank.empty:
-        fig_volume_rank = px.bar(
-            volume_rank.sort_values("Volume"),
-            x="Volume", y="Ticker", orientation="h",
-            color="Day chg (%)" if "Day chg (%)" in volume_rank.columns else None,
-            color_continuous_scale="RdYlGn",
-            hover_data={"Company": True, "Last": ":.2f"},
-            title="Highest volume in the latest session",
-        )
+        ordered = volume_rank.sort_values("Volume")
+        day_chg = ordered["Day chg (%)"] if "Day chg (%)" in ordered.columns else pd.Series(0, index=ordered.index)
+        colors = [UP_COLOR if pd.notna(v) and v >= 0 else DOWN_COLOR for v in day_chg]
+        fig_volume_rank = go.Figure(go.Bar(
+            x=ordered["Volume"], y=ordered["Ticker"], orientation="h",
+            marker_color=colors, marker_line_width=0,
+            hovertemplate="%{y}: %{x:,.0f} shares<extra></extra>",
+        ))
         fig_volume_rank.update_layout(
+            title="Highest volume in the latest session",
             height=410, xaxis_title="Shares", yaxis_title="",
-            margin=dict(l=5, r=5, t=55, b=5), coloraxis_showscale=False,
+            margin=dict(l=8, r=12, t=48, b=8),
             paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+            showlegend=False,
         )
+        fig_volume_rank.update_xaxes(tickformat="~s", gridcolor=GRID_COLOR)
+        fig_volume_rank.update_yaxes(showgrid=False)
         st.plotly_chart(fig_volume_rank, width="stretch", config={"displayModeBar": False})
 
     st.subheader("Starter universe")
@@ -1256,12 +1350,21 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
     )
     fig_line = px.line(
         normalized, x="date", y="Indexed (start = 100)", color="ticker",
-        title=f"Indexed price · {PERIOD_LABELS[period]}",
-        labels={"date": "Date", "ticker": "Ticker"},
+        title=f"Rebased performance · {PERIOD_LABELS[period]}",
+        labels={"date": "Date", "ticker": "Ticker", "Indexed (start = 100)": "Rebased (start = 100)"},
     )
-    fig_line.update_layout(height=470, hovermode="x unified", yaxis_title="Indexed price", xaxis_title="Date")
-    fig_line.update_layout(paper_bgcolor="#ffffff", plot_bgcolor="#ffffff")
+    fig_line.add_hline(y=100, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
+    fig_line.update_layout(
+        height=470, hovermode="x unified",
+        yaxis_title="Rebased level (start of window = 100)",
+        xaxis_title="Date",
+        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        legend_title_text="Ticker",
+    )
+    fig_line.update_xaxes(showgrid=False)
+    fig_line.update_yaxes(gridcolor=GRID_COLOR, zeroline=False, side="right")
     st.plotly_chart(fig_line, width="stretch", config={"displayModeBar": False})
+    st.caption("This is not the share price. Each series is rebased to 100 at the start of the window so you can compare percentage paths.")
     scat = metrics[metrics["Ticker"].isin(compare_tickers)].copy()
     if not scat.empty:
         fig_scatter = px.scatter(
@@ -1270,10 +1373,13 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
             title="Return vs risk",
         )
         fig_scatter.update_traces(textposition="top center", marker={"size": 12, "opacity": 0.8})
+        fig_scatter.add_hline(y=0, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
         fig_scatter.update_layout(
             height=450, xaxis_title="Ann. volatility (%)", yaxis_title="Period return (%)",
             paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
         )
+        fig_scatter.update_xaxes(gridcolor=GRID_COLOR)
+        fig_scatter.update_yaxes(gridcolor=GRID_COLOR, zeroline=True, zerolinecolor="#b2b5be")
         st.plotly_chart(fig_scatter, width="stretch", config={"displayModeBar": False})
     st.caption("Past return and volatility describe history. They are not a forecast.")
 
@@ -1313,13 +1419,13 @@ def render_stock_details() -> None:
     dcol.metric("Max drawdown", pct(m.get("Max drawdown (%)", np.nan)))
 
     if not series.empty:
-        price_fig = build_price_chart(series, focus, "Line")
-        price_fig.update_layout(title=f"{display_symbol(focus)} close")
+        prev_close = None
+        if isinstance(m, pd.Series) and pd.notna(m.get("Last")) and "Day chg (%)" in m.index and pd.notna(m.get("Day chg (%)")):
+            last_px = float(m["Last"])
+            prev_close = last_px / (1 + float(m["Day chg (%)"]) / 100) if float(m["Day chg (%)"]) != -100 else None
+        price_fig = build_price_chart(series, focus, "Candle", previous_close=prev_close, range_key="1Y")
         st.plotly_chart(price_fig, width="stretch", config={"displayModeBar": False})
-        if "Volume" in series.columns:
-            vol_fig = px.bar(series.reset_index(), x=series.reset_index().columns[0], y="Volume", title=f"{display_symbol(focus)} volume")
-            vol_fig.update_layout(height=300, paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", xaxis_title="Date", yaxis_title="Shares")
-            st.plotly_chart(vol_fig, width="stretch", config={"displayModeBar": False})
+        st.caption("Candles are daily OHLC. Volume is under the price. Green = close ≥ open. Scale is zoomed to this window.")
 
     add_col, live_col = st.columns(2)
     if add_col.button("Add to watchlist", width="stretch"):
@@ -1457,26 +1563,12 @@ def render_live_quotes() -> None:
             m3.metric("Bar volume", f"{last_volume:,.0f}" if pd.notna(last_volume) else "—")
             m4.metric("Bars returned", f"{len(valid):,}")
 
-            chart_left, chart_right = st.columns([1.6, 1], gap="large")
-            with chart_left:
-                candle = go.Figure(data=[go.Candlestick(
-                    x=valid.index,
-                    open=valid["Open"], high=valid["High"], low=valid["Low"], close=valid["Close"],
-                    name=selected_symbol,
-                    increasing_line_color="#089981",
-                    decreasing_line_color="#f23645",
-                )])
-                candle.update_layout(
-                    title=f"{selected_symbol} · {selected_interval} bars",
-                    xaxis_title="Time (as returned by Yahoo)",
-                    yaxis_title="USD",
-                    xaxis_rangeslider_visible=False,
-                )
-                st.plotly_chart(restyle_chart(candle, 480), width="stretch", config={"displayModeBar": False})
-            with chart_right:
-                volume_figure = go.Figure(data=[go.Bar(x=valid.index, y=valid["Volume"], name="Volume", marker_color="#2962ff")])
-                volume_figure.update_layout(title="Volume per bar", xaxis_title="Time", yaxis_title="Shares")
-                st.plotly_chart(restyle_chart(volume_figure, 480), width="stretch", config={"displayModeBar": False})
+            live_fig = build_price_chart(valid, selected_symbol, "Candle", range_key="1D")
+            st.plotly_chart(live_fig, width="stretch", config={"displayModeBar": False})
+            st.caption(
+                "Intraday OHLC candles with volume underneath (green if that bar closed ≥ open). "
+                "This is a classroom feed, not an exchange plot."
+            )
 
             with st.expander("Latest minute rows", expanded=False):
                 detail = valid.tail(30).copy()
