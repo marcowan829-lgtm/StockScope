@@ -289,12 +289,6 @@ def chg_class(value: float) -> str:
     return "chg-up" if value > 0 else "chg-down"
 
 
-def chg_arrow(value: float) -> str:
-    if pd.isna(value) or value == 0:
-        return ""
-    return "↑" if value > 0 else "↓"
-
-
 def money(value: float) -> str:
     if pd.isna(value):
         return "—"
@@ -1020,9 +1014,8 @@ def index_card_html(ticker: str, snap_row: dict) -> str:
     last = snap_row.get("last", np.nan)
     chg_pct = snap_row.get("chg_pct", np.nan)
     klass = chg_class(chg_pct)
-    arrow = chg_arrow(chg_pct)
     last_text = "—" if pd.isna(last) else f"{last:,.2f}"
-    chg_text = "—" if pd.isna(chg_pct) else f"{arrow} {abs(chg_pct):.2f}%"
+    chg_text = format_chg(chg_pct, True)
     return (
         '<div class="index-card">'
         '<div class="index-card-top">'
