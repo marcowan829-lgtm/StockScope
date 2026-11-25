@@ -919,17 +919,56 @@ def lookup_snapshot(snap: pd.DataFrame, ticker: str) -> dict:
     return hit.iloc[0].to_dict()
 
 
+def _take_pending(pending_key: str):
+    if pending_key not in st.session_state:
+        return None
+    return st.session_state.pop(pending_key)
+
+
+def apply_pending_nav_pills() -> None:
+    value = _take_pending("_pending_nav_pills")
+    if value is None:
+        return
+    st.session_state.nav_pills = value
+    st.session_state._last_nav_pill = value
+
+
+def apply_pending_idx_switcher() -> None:
+    value = _take_pending("_pending_idx_switcher")
+    if value is not None:
+        st.session_state.idx_switcher = value
+
+
+def apply_pending_markets_tab() -> None:
+    value = _take_pending("_pending_markets_tab")
+    if value is not None:
+        st.session_state.markets_tab = value
+
+
+def apply_pending_learn_tab() -> None:
+    value = _take_pending("_pending_learn_tab")
+    if value is not None:
+        st.session_state.learn_tab = value
+
+
+def apply_pending_widgets() -> None:
+    """Apply queued widget values. Call only before those widgets exist."""
+    apply_pending_nav_pills()
+    apply_pending_idx_switcher()
+    apply_pending_markets_tab()
+    apply_pending_learn_tab()
+
+
 def go_to(nav: str, markets_tab: str | None = None, learn_tab: str | None = None) -> None:
     st.session_state.nav = nav
     if nav in TOP_NAV:
-        st.session_state.nav_pills = nav
-        st.session_state._last_nav_pill = nav
+        st.session_state._pending_nav_pills = nav
         st.session_state.index_full_chart = False
     if markets_tab:
-        st.session_state.markets_tab = markets_tab
+        st.session_state._pending_markets_tab = markets_tab
         st.session_state.markets_tab_persist = markets_tab
     if learn_tab:
-        st.session_state.learn_tab = learn_tab
+        st.session_state._pending_learn_tab = learn_tab
         st.session_state.learn_tab_persist = learn_tab
 
 
@@ -937,7 +976,14 @@ def open_index_page(ticker: str) -> None:
     st.session_state.selected_symbol = ticker
     st.session_state.nav = "Index"
     st.session_state.index_full_chart = False
-    st.session_state.idx_switcher = ticker
+    st.session_state._pending_idx_switcher = ticker
+
+
+def on_idx_switch() -> None:
+    picked = st.session_state.get("idx_switcher")
+    if picked in INDEX_META:
+        st.session_state.selected_symbol = picked
+        st.session_state.index_full_chart = False
 
 
 def trailing_return(prices: pd.DataFrame, ticker: str, days: int) -> float:
@@ -1026,6 +1072,9 @@ def on_search_change() -> None:
         st.session_state.selected_symbol = ticker
         if ticker in INDEX_META:
             open_index_page(ticker)
+        else:
+            st.session_state.nav = "Home"
+            st.session_state.index_full_chart = False
 
 
 def bind_widget(key: str, persist_key: str, default) -> None:
@@ -1126,9 +1175,13 @@ def render_top_nav() -> None:
             st.session_state.search_result = {"ticker": chosen}
             if chosen in INDEX_META:
                 open_index_page(chosen)
+            else:
+                st.session_state.nav = "Home"
+                st.session_state.index_full_chart = False
             st.rerun()
     if st.session_state.get("flash"):
         st.caption(st.session_state.flash)
+        st.session_state.flash = ""
 
 
 def index_card_title_html(ticker: str) -> str:
@@ -1307,6 +1360,7 @@ def _index_chart_figure(ticker: str, snap: pd.DataFrame, *, tall: bool = False) 
 
 
 def render_index_page() -> None:
+    apply_pending_idx_switcher()
     ticker = st.session_state.selected_symbol
     if ticker not in INDEX_META:
         ticker = INDEX_ORDER[0]
@@ -1356,16 +1410,16 @@ def render_index_page() -> None:
             go_to("Home")
             st.rerun()
     with nav_mid:
-        picked = st.pills(
+        if "idx_switcher" not in st.session_state:
+            st.session_state.idx_switcher = ticker if ticker in INDEX_ORDER else INDEX_ORDER[0]
+        st.pills(
             "Index",
             INDEX_ORDER,
             format_func=lambda t: INDEX_META[t]["display"],
             key="idx_switcher",
+            on_change=on_idx_switch,
             label_visibility="collapsed",
         )
-        if picked and picked != ticker:
-            open_index_page(picked)
-            st.rerun()
     with nav_r:
         add_c, full_c = st.columns(2)
         with add_c:
@@ -1644,6 +1698,7 @@ def remember_markets_tab() -> None:
 
 
 def render_markets() -> None:
+    apply_pending_markets_tab()
     bind_widget("markets_tab", "markets_tab_persist", "Overview")
     st.segmented_control("Markets", options=MARKET_TABS, key="markets_tab", on_change=remember_markets_tab)
     tab = st.session_state.markets_tab
@@ -2159,6 +2214,7 @@ def remember_learn_tab() -> None:
 
 
 def render_learn() -> None:
+    apply_pending_learn_tab()
     bind_widget("learn_tab", "learn_tab_persist", "Start here")
     st.segmented_control("Learn", options=LEARN_TABS, key="learn_tab", on_change=remember_learn_tab)
     if st.session_state.learn_tab == "Start here":
@@ -2269,6 +2325,7 @@ def render_watchlist_page() -> None:
 
 def main() -> None:
     init_state()
+    apply_pending_widgets()
     st.markdown(APP_STYLE, unsafe_allow_html=True)
     render_top_nav()
 
