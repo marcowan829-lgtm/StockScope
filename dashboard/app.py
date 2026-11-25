@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+import html
+import re
 from typing import Iterable
 
 import numpy as np
@@ -9,36 +10,128 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
+from plotly.subplots import make_subplots
 
 
 st.set_page_config(
-    page_title="StockScope｜美股探索仪表盘",
+    page_title="StockScope · Stock market for beginner",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# A curated, editable starter universe. Sector labels are a project-level grouping,
-# not a claim that this list represents the complete US stock market.
-UNIVERSE = {
-    "AAPL": "科技", "MSFT": "科技", "NVDA": "科技", "GOOGL": "科技",
-    "AMZN": "科技/消费", "META": "科技", "AVGO": "科技", "ORCL": "科技",
-    "CRM": "科技", "AMD": "科技", "QCOM": "科技", "INTC": "科技",
-    "CSCO": "科技", "ADBE": "科技", "IBM": "科技",
-    "JPM": "金融", "BAC": "金融", "GS": "金融", "MS": "金融",
-    "V": "金融", "MA": "金融", "PYPL": "金融", "BRK-B": "金融",
-    "LLY": "医疗保健", "JNJ": "医疗保健", "UNH": "医疗保健",
-    "ABBV": "医疗保健", "MRK": "医疗保健", "PFE": "医疗保健", "ISRG": "医疗保健",
-    "WMT": "消费", "COST": "消费", "HD": "消费", "NKE": "消费",
-    "MCD": "消费", "KO": "消费", "PG": "消费", "DIS": "消费", "NFLX": "消费/媒体",
-    "CAT": "工业", "GE": "工业", "RTX": "工业", "HON": "工业", "UPS": "工业", "DE": "工业",
-    "XOM": "能源", "CVX": "能源", "SLB": "能源",
-    "SPY": "市场基准", "QQQ": "市场基准", "DIA": "市场基准",
+TOP_NAV = ["Home", "Learn", "Markets", "Watchlist"]
+MARKET_TABS = ["Overview", "Screener", "Live quotes", "Returns & risk", "Stock"]
+LEARN_TABS = ["Start here", "Data & methods"]
+UP_COLOR = "#089981"
+DOWN_COLOR = "#f23645"
+PREV_CLOSE_COLOR = "#787b86"
+GRID_COLOR = "#f0f3fa"
+SPIKE_COLOR = "#9598a1"
+
+CHART_RANGES = {
+    "1D": {"period": "1d", "interval": "5m"},
+    "5D": {"period": "5d", "interval": "15m"},
+    "1M": {"period": "1mo", "interval": "1d"},
+    "6M": {"period": "6mo", "interval": "1d"},
+    "1Y": {"period": "1y", "interval": "1d"},
+    "All Time": {"period": "max", "interval": "1wk"},
+}
+CHART_TYPES = ["Line", "Candle", "Area", "Baseline"]
+INTRADAY_RANGES = {"1D", "5D"}
+ET_ZONE = "America/New_York"
+SESSION_OPEN_HOUR = 9.5
+SESSION_CLOSE_HOUR = 16.0
+SESSION_OPEN_MIN = 9 * 60 + 30
+SESSION_CLOSE_MIN = 16 * 60
+AREA_FILL_UP = "rgba(8,153,129,0.28)"
+AREA_FILL_DOWN = "rgba(242,54,69,0.22)"
+PERIOD_LABELS = {
+    "1mo": "1 month",
+    "3mo": "3 months",
+    "6mo": "6 months",
+    "1y": "1 year",
+    "2y": "2 years",
+    "5y": "5 years",
+}
+INDEX_META = {
+    "^GSPC": {
+        "display": "SPX",
+        "name": "S&P 500",
+        "blurb": "Broad view of large US companies",
+        "unit": "point",
+        "badge": "500",
+        "badge_bg": "#f23645",
+        "proxy": "SPY",
+        "members": "About 500 large US companies",
+        "about": (
+            "The S&P 500 is a single number that follows 500 large companies listed in the United States. "
+            "When this number rises, that slice of the market is generally up; when it falls, that slice is generally down. "
+            "You cannot buy the index itself. A fund such as SPY is a common way to follow it in a brokerage account."
+        ),
+        "related": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"],
+    },
+    "^NDX": {
+        "display": "NDX",
+        "name": "NASDAQ 100",
+        "blurb": "Largest non-financial Nasdaq companies",
+        "unit": "point",
+        "badge": "100",
+        "badge_bg": "#2962ff",
+        "proxy": "QQQ",
+        "members": "About 100 large non-financial Nasdaq names",
+        "about": (
+            "The Nasdaq 100 follows the largest non-financial companies listed on Nasdaq. "
+            "Technology names have a heavy weight, so this index can move more than the S&P 500 on tech news. "
+            "A fund such as QQQ is a common way to follow it."
+        ),
+        "related": ["NVDA", "AAPL", "MSFT", "AMZN", "META"],
+    },
+    "^DJI": {
+        "display": "DJI",
+        "name": "Dow Jones",
+        "blurb": "30 major US industrial companies",
+        "unit": "USD",
+        "badge": "30",
+        "badge_bg": "#131722",
+        "proxy": "DIA",
+        "members": "30 large US companies",
+        "about": (
+            "The Dow Jones Industrial Average follows 30 well-known US companies. "
+            "It is a short list, so one member can move the number more than in the S&P 500. "
+            "A fund such as DIA is a common way to follow it."
+        ),
+        "related": ["JPM", "UNH", "HD", "CAT", "MCD"],
+    },
+}
+INDEX_ORDER = ["^GSPC", "^NDX", "^DJI"]
+INDEX_ALIASES = {
+    "SPX": "^GSPC", "S&P": "^GSPC", "S&P500": "^GSPC", "SP500": "^GSPC",
+    "GSPC": "^GSPC", "^GSPC": "^GSPC", "SNP": "^GSPC",
+    "NDX": "^NDX", "NASDAQ": "^NDX", "NASDAQ100": "^NDX", "IXIC": "^NDX",
+    "^NDX": "^NDX",
+    "DJI": "^DJI", "DJIA": "^DJI", "DOW": "^DJI", "^DJI": "^DJI",
 }
 
+UNIVERSE = {
+    "AAPL": "Technology", "MSFT": "Technology", "NVDA": "Technology", "GOOGL": "Technology",
+    "AMZN": "Tech / consumer", "META": "Technology", "AVGO": "Technology", "ORCL": "Technology",
+    "CRM": "Technology", "AMD": "Technology", "QCOM": "Technology", "INTC": "Technology",
+    "CSCO": "Technology", "ADBE": "Technology", "IBM": "Technology",
+    "JPM": "Financials", "BAC": "Financials", "GS": "Financials", "MS": "Financials",
+    "V": "Financials", "MA": "Financials", "PYPL": "Financials", "BRK-B": "Financials",
+    "LLY": "Health care", "JNJ": "Health care", "UNH": "Health care",
+    "ABBV": "Health care", "MRK": "Health care", "PFE": "Health care", "ISRG": "Health care",
+    "WMT": "Consumer", "COST": "Consumer", "HD": "Consumer", "NKE": "Consumer",
+    "MCD": "Consumer", "KO": "Consumer", "PG": "Consumer", "DIS": "Consumer", "NFLX": "Consumer / media",
+    "CAT": "Industrials", "GE": "Industrials", "RTX": "Industrials", "HON": "Industrials",
+    "UPS": "Industrials", "DE": "Industrials",
+    "XOM": "Energy", "CVX": "Energy", "SLB": "Energy",
+    "SPY": "Market benchmark", "QQQ": "Market benchmark", "DIA": "Market benchmark",
+}
 
 COMPANY_NAMES = {
-    "AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "NVIDIA", "GOOGL": "Alphabet A",
+    "AAPL": "Apple Inc", "MSFT": "Microsoft", "NVDA": "NVIDIA", "GOOGL": "Alphabet A",
     "AMZN": "Amazon", "META": "Meta Platforms", "AVGO": "Broadcom", "ORCL": "Oracle",
     "CRM": "Salesforce", "AMD": "AMD", "QCOM": "Qualcomm", "INTC": "Intel",
     "CSCO": "Cisco", "ADBE": "Adobe", "IBM": "IBM",
@@ -54,25 +147,236 @@ COMPANY_NAMES = {
     "SPY": "SPDR S&P 500 ETF", "QQQ": "Invesco Nasdaq-100 ETF", "DIA": "SPDR Dow Jones ETF",
 }
 
-PERIOD_LABELS = {
-    "1mo": "近 1 个月",
-    "3mo": "近 3 个月",
-    "6mo": "近 6 个月",
-    "1y": "近 1 年",
-    "2y": "近 2 年",
-    "5y": "近 5 年",
-}
+APP_STYLE = """
+<style>
+  html, body, [data-testid="stAppViewContainer"], .stApp {
+    background: #ffffff;
+    color: #131722;
+    font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;
+  }
+  [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+  header[data-testid="stHeader"] { display: none !important; }
+  div[data-testid="stDecoration"], div[data-testid="stToolbar"] { display: none !important; }
+  .stAppDeployButton, #MainMenu, footer { display: none !important; }
+  .block-container { padding-top: 1rem; padding-bottom: 2.2rem; max-width: 1440px; }
+  div[data-testid="stMetric"] {
+    background: #fff;
+    border: 1px solid #e0e3eb;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+  }
+  .topnav {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem 1.15rem;
+    flex-wrap: wrap;
+    min-height: 2.6rem;
+    padding: 0.15rem 0 0.55rem 0;
+  }
+  .brand {
+    font-size: 1.22rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: #131722;
+    margin-right: 0.45rem;
+  }
+  .hero-title {
+    font-size: 1.72rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0.15rem 0 0.2rem 0;
+    line-height: 1.2;
+  }
+  .hero-sub { color: #6a6d78; font-size: 0.98rem; margin: 0 0 0.85rem 0; }
+  .index-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0 0 1rem 0;
+  }
+  .index-card {
+    border: 1px solid #e0e3eb;
+    border-radius: 12px;
+    padding: 0.9rem 1rem 0.85rem 1rem;
+    background: #fff;
+    min-height: 118px;
+  }
+  .index-card-top { display: flex; align-items: flex-start; gap: 0.7rem; }
+  .idx-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+  .idx-head-main { display: flex; align-items: flex-start; gap: 0.7rem; min-width: 0; }
+  .range-track {
+    position: relative; height: 8px; background: #eef0f5; border-radius: 99px; margin: 0.55rem 0 0.35rem 0;
+  }
+  .range-dot {
+    position: absolute; top: 50%; width: 12px; height: 12px; margin-top: -6px; margin-left: -6px;
+    background: #131722; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #c8ccd6;
+  }
+  .stat-chip {
+    border: 1px solid #e0e3eb; border-radius: 10px; padding: 0.65rem 0.75rem; background: #fff;
+  }
+  .stat-chip .k { color: #6a6d78; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .stat-chip .v { font-weight: 700; font-size: 1.02rem; font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
+  .about-box {
+    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #f7f8fa;
+  }
+  .idx-badge {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 0.7rem; flex: 0 0 36px;
+    letter-spacing: -0.02em;
+  }
+  .idx-name { font-weight: 700; font-size: 0.98rem; line-height: 1.2; }
+  .idx-ticker {
+    display: inline-block; margin-left: 0.35rem; font-size: 0.75rem; font-weight: 700;
+    color: #6a6d78; background: #f0f3fa; border-radius: 4px; padding: 0.05rem 0.35rem;
+  }
+  .idx-blurb { color: #6a6d78; font-size: 0.8rem; margin-top: 0.15rem; }
+  .idx-quote { display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.7rem; gap: 0.5rem; }
+  .last-px { font-size: 1.28rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .last-unit { color: #6a6d78; font-size: 0.78rem; font-weight: 600; margin-left: 0.25rem; }
+  .chg-up { color: #089981; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chg-down { color: #f23645; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chg-flat { color: #6a6d78; font-weight: 600; }
+  .quote-name { font-size: 1.28rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+  .quote-ticker { color: #6a6d78; font-size: 0.95rem; font-weight: 700; margin-left: 0.4rem; }
+  .quote-last { font-size: 1.55rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+  .muted { color: #6a6d78; font-size: 0.88rem; }
+  .small-note { font-size: 0.86rem; color: #6a6d78; }
+  .wl-title { font-size: 1.05rem; font-weight: 700; margin: 0; }
+  .section-label {
+    font-size: 0.75rem; font-weight: 700; color: #6a6d78; letter-spacing: 0.04em;
+    text-transform: uppercase; margin: 0.35rem 0 0.2rem 0;
+  }
+  .learn-card {
+    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #f7f8fa;
+  }
+  .learn-card h3 { margin: 0 0 0.4rem 0; font-size: 1.02rem; }
+  .learn-card p, .learn-card li { color: #4c4f59; font-size: 0.92rem; }
+  div.st-key-nav_pills [data-testid="stMarkdownContainer"] p { font-weight: 600; }
+  div.st-key-nav_search [data-testid="stTextInputRootElement"] {
+    border-radius: 24px;
+    background: #f0f3fa;
+    border: 1px solid #e0e3eb;
+  }
+  div.st-key-nav_search input { background: transparent; }
+  .nav-rule { border: 0; border-top: 1px solid #e0e3eb; margin: 0.1rem 0 0.85rem 0; }
+  div[class*="st-key-idx_add_"] button,
+  div[class*="st-key-idx_open_"] button {
+    min-width: 2.15rem !important;
+    min-height: 2.15rem !important;
+    height: 2.15rem !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    border: 1px solid #d8dbe3 !important;
+    background: #fff !important;
+    font-size: 0.95rem !important;
+    line-height: 1 !important;
+  }
+  div.st-key-idx_full_chart button,
+  div.st-key-idx_exit_full button,
+  div.st-key-idx_back button {
+    min-height: 2.1rem !important;
+    border-radius: 8px !important;
+  }
+  div.st-key-chart_add button {
+    min-height: 2rem !important;
+    padding: 0.15rem 0.5rem !important;
+    border-radius: 8px !important;
+  }
+  div.st-key-chart_type button {
+    font-size: 0.8rem !important;
+    padding: 0.15rem 0.45rem !important;
+    min-height: 2rem !important;
+  }
+  @media (max-width: 900px) {
+    .index-grid { grid-template-columns: 1fr; }
+    .hero-title { font-size: 1.4rem; }
+    .block-container { padding-left: 0.8rem; padding-right: 0.8rem; }
+  }
+</style>
+"""
 
-st.markdown(
-    """
-    <style>
-      .block-container {padding-top: 1.25rem; padding-bottom: 2rem;}
-      div[data-testid="stMetric"] {background: rgba(128,128,128,0.06); border: 1px solid rgba(128,128,128,0.16); padding: 0.8rem 0.9rem; border-radius: 12px;}
-      .small-note {font-size: 0.88rem; opacity: 0.82;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+
+def widget_key(prefix: str, ticker: str) -> str:
+    return f"{prefix}_{ticker.replace('^', 'I').replace('-', '_')}"
+
+
+def display_symbol(ticker: str) -> str:
+    if ticker in INDEX_META:
+        return INDEX_META[ticker]["display"]
+    return ticker
+
+
+def company_name(ticker: str) -> str:
+    if ticker in INDEX_META:
+        return INDEX_META[ticker]["name"]
+    return COMPANY_NAMES.get(ticker, ticker)
+
+
+def is_index(ticker: str) -> bool:
+    return ticker in INDEX_META
+
+
+def ticker_label(ticker: str) -> str:
+    return f"{display_symbol(ticker)} · {company_name(ticker)}"
+
+
+def format_last(ticker: str, value: float) -> str:
+    if pd.isna(value):
+        return "—"
+    if is_index(ticker):
+        return f"{value:,.2f}"
+    return f"${value:,.2f}"
+
+
+def format_chg(value: float, percent: bool = False) -> str:
+    if pd.isna(value):
+        return "—"
+    if percent:
+        return f"{value:+.2f}%"
+    return f"{value:+.2f}"
+
+
+def chg_class(value: float) -> str:
+    if pd.isna(value) or value == 0:
+        return "chg-flat"
+    return "chg-up" if value > 0 else "chg-down"
+
+
+def money(value: float) -> str:
+    if pd.isna(value):
+        return "—"
+    if abs(value) >= 1e12:
+        return f"${value / 1e12:.2f}T"
+    if abs(value) >= 1e9:
+        return f"${value / 1e9:.2f}B"
+    if abs(value) >= 1e6:
+        return f"${value / 1e6:.2f}M"
+    return f"${value:,.2f}"
+
+
+def pct(value: float, digits: int = 2) -> str:
+    return "—" if pd.isna(value) else f"{value:.{digits}f}%"
+
+
+def to_new_york_time(value) -> pd.Timestamp:
+    stamp = pd.Timestamp(value)
+    if stamp.tzinfo is None:
+        return stamp.tz_localize("America/New_York")
+    return stamp.tz_convert("America/New_York")
+
+
+def estimated_us_session(now_et: pd.Timestamp) -> str:
+    if now_et.weekday() >= 5:
+        return "Weekend: the regular US session is usually closed"
+    current_minutes = now_et.hour * 60 + now_et.minute
+    if 4 * 60 <= current_minutes < 9 * 60 + 30:
+        return "Pre-market (clock estimate)"
+    if 9 * 60 + 30 <= current_minutes < 16 * 60:
+        return "Regular session (clock estimate)"
+    if 16 * 60 <= current_minutes < 20 * 60:
+        return "After hours (clock estimate)"
+    return "Outside the regular session"
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -96,7 +400,6 @@ def download_prices(tickers: tuple[str, ...], period: str) -> pd.DataFrame:
 
     def extract_field(frame: pd.DataFrame, field: str) -> pd.DataFrame:
         if isinstance(frame.columns, pd.MultiIndex):
-            # yfinance versions can vary in which MultiIndex level holds the field.
             if field in frame.columns.get_level_values(0):
                 out = frame[field].copy()
             elif field in frame.columns.get_level_values(1):
@@ -110,7 +413,7 @@ def download_prices(tickers: tuple[str, ...], period: str) -> pd.DataFrame:
             if len(tickers) == 1:
                 out.columns = [tickers[0]]
         if isinstance(out, pd.Series):
-            out = out.to_frame(name=tickers[0] if len(tickers) == 1 else field)
+            out = out.to_frame(name=tickers[0] if len(tickers) else field)
         return out
 
     close = extract_field(raw, "Close")
@@ -134,7 +437,6 @@ def download_prices(tickers: tuple[str, ...], period: str) -> pd.DataFrame:
 
 @st.cache_data(ttl=15, show_spinner=False)
 def download_intraday_one(ticker: str, interval: str, include_extended: bool) -> pd.DataFrame:
-    """Fetch one symbol's latest intraday bars. Yahoo may delay, omit, or throttle data."""
     data = yf.Ticker(ticker).history(
         period="1d",
         interval=interval,
@@ -155,36 +457,72 @@ def download_intraday_one(ticker: str, interval: str, include_extended: bool) ->
     return data
 
 
-def to_new_york_time(value) -> pd.Timestamp:
-    """Normalize Yahoo bar timestamp to America/New_York for display and age checks."""
-    stamp = pd.Timestamp(value)
-    if stamp.tzinfo is None:
-        return stamp.tz_localize("America/New_York")
-    return stamp.tz_convert("America/New_York")
-
-
-def estimated_us_session(now_et: pd.Timestamp) -> str:
-    """Rough clock-based session label; intentionally does not verify exchange holidays."""
-    if now_et.weekday() >= 5:
-        return "周末：常规美股市场通常休市"
-    current_minutes = now_et.hour * 60 + now_et.minute
-    if 4 * 60 <= current_minutes < 9 * 60 + 30:
-        return "盘前时段（按当地时钟估算）"
-    if 9 * 60 + 30 <= current_minutes < 16 * 60:
-        return "常规交易时段（按当地时钟估算）"
-    if 16 * 60 <= current_minutes < 20 * 60:
-        return "盘后时段（按当地时钟估算）"
-    return "常规交易时段之外"
+@st.cache_data(ttl=180, show_spinner=False)
+def download_ohlc(ticker: str, period: str, interval: str) -> pd.DataFrame:
+    try:
+        data = yf.Ticker(ticker).history(
+            period=period,
+            interval=interval,
+            auto_adjust=True,
+            actions=False,
+            prepost=False,
+        )
+    except Exception:
+        return pd.DataFrame()
+    if data is None or data.empty:
+        if period == "1d":
+            try:
+                data = yf.Ticker(ticker).history(
+                    period="5d",
+                    interval=interval,
+                    auto_adjust=True,
+                    actions=False,
+                    prepost=False,
+                )
+            except Exception:
+                return pd.DataFrame()
+        if data is None or data.empty:
+            return pd.DataFrame()
+        last_day = pd.Timestamp(data.index[-1]).date()
+        data = data[pd.Series(data.index.date, index=data.index) == last_day]
+    data = data.copy()
+    for column in ["Open", "High", "Low", "Close", "Volume"]:
+        if column in data.columns:
+            data[column] = pd.to_numeric(data[column], errors="coerce")
+    if "Close" not in data.columns:
+        return pd.DataFrame()
+    return data.dropna(subset=["Close"]).sort_index()
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_ticker_info(ticker: str) -> dict:
-    """Yahoo metadata can be incomplete or unavailable for some symbols."""
     try:
         info = yf.Ticker(ticker).get_info()
         return info if isinstance(info, dict) else {}
     except Exception:
         return {}
+
+
+def snapshot_from_prices(prices: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    if prices.empty:
+        return pd.DataFrame(columns=["ticker", "last", "chg", "chg_pct", "as_of"])
+    for ticker, group in prices.groupby("ticker"):
+        g = group.sort_values("date").dropna(subset=["close"])
+        if g.empty:
+            continue
+        last_close = float(g.iloc[-1]["close"])
+        previous_close = float(g.iloc[-2]["close"]) if len(g) >= 2 else np.nan
+        chg = last_close - previous_close if pd.notna(previous_close) else np.nan
+        chg_pct = (chg / previous_close) * 100 if pd.notna(previous_close) and previous_close else np.nan
+        rows.append({
+            "ticker": str(ticker),
+            "last": last_close,
+            "chg": chg,
+            "chg_pct": chg_pct,
+            "as_of": g["date"].max().date(),
+        })
+    return pd.DataFrame(rows)
 
 
 def calculate_metrics(prices: pd.DataFrame) -> pd.DataFrame:
@@ -201,60 +539,20 @@ def calculate_metrics(prices: pd.DataFrame) -> pd.DataFrame:
         volatility = returns.std(ddof=1) * np.sqrt(252) * 100 if len(returns) > 1 else np.nan
         drawdown = (close / close.cummax() - 1).min() * 100
         rows.append({
-            "代码": ticker,
-            "类别": UNIVERSE.get(ticker, "其他"),
-            "最新收盘价": last_price,
-            "区间涨跌幅 (%)": total_return,
-            "年化波动率 (%)": volatility,
-            "最大回撤 (%)": float(drawdown),
-            "平均日成交量": float(g["volume"].mean()) if g["volume"].notna().any() else np.nan,
-            "最新日成交量": float(g["volume"].iloc[-1]) if pd.notna(g["volume"].iloc[-1]) else np.nan,
-            "数据起始日": g["date"].min().date(),
-            "最新数据日": g["date"].max().date(),
+            "Ticker": ticker,
+            "Group": UNIVERSE.get(ticker, "Other"),
+            "Company": company_name(str(ticker)),
+            "Last": last_price,
+            "Period return (%)": total_return,
+            "Ann. volatility (%)": volatility,
+            "Max drawdown (%)": float(drawdown),
+            "Avg volume": float(g["volume"].mean()) if g["volume"].notna().any() else np.nan,
+            "Volume": float(g["volume"].iloc[-1]) if pd.notna(g["volume"].iloc[-1]) else np.nan,
+            "From": g["date"].min().date(),
+            "As of": g["date"].max().date(),
         })
     return pd.DataFrame(rows)
 
-
-def money(value: float) -> str:
-    if pd.isna(value):
-        return "—"
-    if abs(value) >= 1e12:
-        return f"${value / 1e12:.2f}T"
-    if abs(value) >= 1e9:
-        return f"${value / 1e9:.2f}B"
-    if abs(value) >= 1e6:
-        return f"${value / 1e6:.2f}M"
-    return f"${value:,.2f}"
-
-
-def pct(value: float, digits: int = 2) -> str:
-    return "—" if pd.isna(value) else f"{value:.{digits}f}%"
-
-
-
-def calculate_daily_snapshot(prices: pd.DataFrame) -> pd.DataFrame:
-    """Create per-ticker latest-close and prior-session change for the homepage."""
-    rows = []
-    if prices.empty:
-        return pd.DataFrame(columns=["代码", "公司", "最近交易日涨跌幅 (%)"])
-    for ticker, group in prices.groupby("ticker"):
-        g = group.sort_values("date").dropna(subset=["close"])
-        if g.empty:
-            continue
-        last = g.iloc[-1]
-        previous_close = float(g.iloc[-2]["close"]) if len(g) >= 2 else np.nan
-        last_close = float(last["close"])
-        daily_change = ((last_close / previous_close) - 1) * 100 if pd.notna(previous_close) and previous_close else np.nan
-        rows.append({
-            "代码": str(ticker),
-            "公司": COMPANY_NAMES.get(str(ticker), str(ticker)),
-            "最近交易日涨跌幅 (%)": daily_change,
-        })
-    return pd.DataFrame(rows)
-
-
-def ticker_label(ticker: str) -> str:
-    return f"{ticker} · {COMPANY_NAMES.get(ticker, ticker)}"
 
 def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
     temp = prices.copy()
@@ -267,8 +565,8 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
     if monthly_returns.empty:
         return None
     monthly_returns = monthly_returns.iloc[:, 1:]
-    monthly_returns["类别"] = [UNIVERSE.get(t, "其他") for t in monthly_returns.index]
-    sect = monthly_returns.groupby("类别").mean(numeric_only=True)
+    monthly_returns["Group"] = [UNIVERSE.get(t, "Other") for t in monthly_returns.index]
+    sect = monthly_returns.groupby("Group").mean(numeric_only=True)
     if sect.empty or sect.shape[1] == 0:
         return None
     labels = [pd.Timestamp(c).strftime("%Y-%m") for c in sect.columns]
@@ -278,148 +576,1535 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
         y=sect.index.tolist(),
         colorscale="RdYlGn",
         zmid=0,
-        colorbar={"title": "月涨跌幅 %"},
-        hovertemplate="类别：%{y}<br>月份：%{x}<br>平均涨跌幅：%{z:.2f}%<extra></extra>",
+        colorbar={"title": "Monthly %"},
+        hovertemplate="Group: %{y}<br>Month: %{x}<br>Avg return: %{z:.2f}%<extra></extra>",
     ))
-    fig.update_layout(title="行业分组月度表现热力图（组内股票等权平均）", xaxis_title="月份", yaxis_title="分类", height=420, margin=dict(l=10, r=10, t=60, b=10))
+    fig.update_layout(
+        title="Group monthly returns (0% = unchanged · equal-weighted inside each group)",
+        xaxis_title="Month",
+        yaxis_title="Group",
+        height=420,
+        margin=dict(l=10, r=10, t=60, b=10),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+    )
     return fig
 
 
-# Header and navigation
-st.title("📈 StockScope｜美股研究工作台")
-st.markdown("以盘中分钟行情为核心，兼顾历史收益、风险与个股研究。")
-st.caption("盘中数据来自 Yahoo Finance 的第三方 yfinance 接口；时间戳接近当前时间不代表已验证的实时或固定延迟行情。")
+def volume_bar_colors(frame: pd.DataFrame) -> list[str]:
+    closes = frame["Close"].astype(float)
+    if "Open" in frame.columns:
+        opens = frame["Open"].astype(float)
+        return [UP_COLOR if c >= o else DOWN_COLOR for o, c in zip(opens, closes)]
+    prev = closes.shift(1)
+    return [UP_COLOR if pd.isna(p) or c >= p else DOWN_COLOR for c, p in zip(closes, prev)]
 
-if "watchlist" not in st.session_state:
-    st.session_state["watchlist"] = ["NVDA", "AAPL", "MSFT", "SPY"]
-if "detail_ticker" not in st.session_state or st.session_state.get("detail_ticker") not in UNIVERSE:
-    st.session_state["detail_ticker"] = "NVDA"
 
-st.sidebar.title("StockScope")
-selected_page = st.sidebar.radio(
-    "主要功能",
-    options=["实时看盘", "市场首页", "市场概览", "股票筛选器", "收益与风险", "个股详情", "方法与数据"],
-    index=0,
-    key="main_navigation",
-)
+def to_et_naive(index: pd.Index) -> pd.DatetimeIndex:
+    idx = pd.DatetimeIndex(index)
+    if idx.tz is not None:
+        return idx.tz_convert(ET_ZONE).tz_localize(None)
+    return idx
 
-if selected_page != "实时看盘":
-    with st.form("global_ticker_search", clear_on_submit=False):
-        search_col, search_button_col = st.columns([5, 1])
-        search_query = search_col.text_input(
-            "全局搜索",
-            placeholder="输入股票代码或公司名称，例如 NVDA、NVIDIA、Apple",
-            help="可搜索内置观察列表中的股票与 ETF。",
-        )
-        search_submitted = search_button_col.form_submit_button("搜索股票", use_container_width=True)
 
-    if search_submitted:
-        q = search_query.strip()
-        q_upper = q.upper()
-        q_lower = q.casefold()
-        exact_ticker = q_upper if q_upper in UNIVERSE else None
-        if exact_ticker is None:
-            exact_ticker = next((t for t, name in COMPANY_NAMES.items() if name.casefold() == q_lower), None)
-        if exact_ticker:
-            st.session_state["detail_ticker"] = exact_ticker
-            st.session_state.pop("search_candidates", None)
-            st.success(f"已定位：{ticker_label(exact_ticker)}。个股详情选择器已更新。")
-        elif q:
-            matches = [t for t in UNIVERSE if q_upper in t.upper() or q_lower in COMPANY_NAMES.get(t, t).casefold()]
-            if len(matches) == 1:
-                st.session_state["detail_ticker"] = matches[0]
-                st.session_state.pop("search_candidates", None)
-                st.success(f"已定位：{ticker_label(matches[0])}。个股详情选择器已更新。")
-            elif matches:
-                st.session_state["search_candidates"] = matches
-                st.info(f"找到 {len(matches)} 个匹配代码，请从下方选择。")
-            else:
-                st.session_state.pop("search_candidates", None)
-                st.warning("没有在当前内置观察列表中找到匹配项。请尝试输入准确的股票代码。")
+def clip_regular_session(frame: pd.DataFrame, range_key: str) -> pd.DataFrame:
+    """Keep regular US-session bars so Plotly never plots overnight or weekend prints."""
+    out = frame.copy()
+    out.index = to_et_naive(out.index)
+    weekday = out.index.day_of_week < 5
+    if range_key in INTRADAY_RANGES:
+        minutes = out.index.hour * 60 + out.index.minute
+        session = (minutes >= SESSION_OPEN_MIN) & (minutes <= SESSION_CLOSE_MIN)
+        return out.loc[weekday & session]
+    return out.loc[weekday]
+
+
+def market_rangebreaks(index: pd.DatetimeIndex, range_key: str) -> list[dict]:
+    """Collapse weekends, US overnight hours, and weekday holidays on the time axis."""
+    breaks: list[dict] = [dict(bounds=["sat", "mon"])]
+    if range_key in INTRADAY_RANGES:
+        breaks.append(dict(bounds=[SESSION_CLOSE_HOUR, SESSION_OPEN_HOUR], pattern="hour"))
+    if len(index) >= 2:
+        idx = pd.DatetimeIndex(index)
+        start, end = idx.min().normalize(), idx.max().normalize()
+        have = {pd.Timestamp(d).normalize() for d in idx}
+        missing = [d for d in pd.bdate_range(start, end) if d not in have]
+        if missing:
+            breaks.append(dict(values=missing))
+    return breaks
+
+
+def _split_at_baseline(index, values, level: float):
+    """Split a series at `level` so the line can be green above and red below."""
+    xs = list(index)
+    ys = [float(v) for v in values]
+    x_hi: list = []
+    y_hi: list = []
+    x_lo: list = []
+    y_lo: list = []
+    for i, (x, y) in enumerate(zip(xs, ys)):
+        if i > 0:
+            y_prev = ys[i - 1]
+            if (y_prev - level) * (y - level) < 0 and y != y_prev:
+                x_prev = xs[i - 1]
+                t = (level - y_prev) / (y - y_prev)
+                x_cross = x_prev + (x - x_prev) * t
+                x_hi.append(x_cross)
+                y_hi.append(level)
+                x_lo.append(x_cross)
+                y_lo.append(level)
+        if y >= level:
+            x_hi.append(x)
+            y_hi.append(y)
+            x_lo.append(None)
+            y_lo.append(None)
         else:
-            st.session_state.pop("search_candidates", None)
-            st.warning("请输入股票代码或公司名称。")
+            x_lo.append(x)
+            y_lo.append(y)
+            x_hi.append(None)
+            y_hi.append(None)
+    return x_hi, y_hi, x_lo, y_lo
 
-    if st.session_state.get("search_candidates"):
-        candidate_col, candidate_button_col = st.columns([4, 1])
-        candidate = candidate_col.selectbox(
-            "搜索匹配结果",
-            options=st.session_state["search_candidates"],
+
+def apply_market_layout(
+    fig: go.Figure,
+    *,
+    height: int,
+    tickformat: str,
+    rangebreaks: list[dict] | None = None,
+) -> go.Figure:
+    fig.update_layout(
+        height=height,
+        margin=dict(l=8, r=64, t=8, b=28),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        hovermode="x unified",
+        showlegend=False,
+        font=dict(color="#131722", size=12, family="Trebuchet MS, Segoe UI, sans-serif"),
+        xaxis_rangeslider_visible=False,
+        spikedistance=-1,
+    )
+    fig.update_yaxes(
+        side="right",
+        showgrid=True,
+        gridcolor=GRID_COLOR,
+        zeroline=False,
+        linecolor="#ffffff",
+        tickfont=dict(color="#6a6d78", size=11),
+        separatethousands=True,
+        showspikes=True,
+        spikemode="across",
+        spikecolor=SPIKE_COLOR,
+        spikethickness=1,
+        spikedash="dot",
+        fixedrange=False,
+    )
+    xaxis_kwargs: dict = dict(
+        showgrid=False,
+        linecolor="#e0e3eb",
+        tickfont=dict(color="#6a6d78", size=11),
+        tickformat=tickformat,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor=SPIKE_COLOR,
+        spikethickness=1,
+        spikedash="dot",
+        rangeslider_visible=False,
+        title_text="",
+    )
+    if rangebreaks:
+        xaxis_kwargs["rangebreaks"] = rangebreaks
+    fig.update_xaxes(**xaxis_kwargs)
+    return fig
+
+
+def restyle_chart(fig: go.Figure, height: int = 420) -> go.Figure:
+    return apply_market_layout(fig, height=height, tickformat="%b %d")
+
+
+def build_price_chart(
+    frame: pd.DataFrame,
+    ticker: str,
+    chart_type: str,
+    *,
+    previous_close: float | None = None,
+    range_key: str = "1D",
+) -> go.Figure:
+    """Quote-site price pane: Line / Candle / Area / Baseline, regular hours only."""
+    empty_ticks = "%I:%M %p" if range_key == "1D" else "%b %d"
+    if frame.empty:
+        return apply_market_layout(go.Figure(), height=460, tickformat=empty_ticks)
+
+    frame = clip_regular_session(frame, range_key)
+    if frame.empty:
+        return apply_market_layout(go.Figure(), height=460, tickformat=empty_ticks)
+
+    kind = chart_type if chart_type in CHART_TYPES else "Line"
+    close = frame["Close"].astype(float)
+    last = float(close.iloc[-1])
+    ref = previous_close if previous_close is not None and pd.notna(previous_close) else float(close.iloc[0])
+    up = last >= ref
+    line_color = UP_COLOR if up else DOWN_COLOR
+    has_ohlc = {"Open", "High", "Low", "Close"}.issubset(frame.columns)
+    has_volume = "Volume" in frame.columns and frame["Volume"].notna().any()
+    if kind == "Candle" and not has_ohlc:
+        kind = "Line"
+
+    x = frame.index
+    name = display_symbol(ticker)
+    # Separate price and volume panes so candles never sit on the volume bars.
+    if has_volume:
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.08,
+            row_heights=[0.82, 0.18],
+        )
+    else:
+        fig = make_subplots(rows=1, cols=1)
+
+    if kind == "Candle":
+        fig.add_trace(go.Candlestick(
+            x=x,
+            open=frame["Open"], high=frame["High"], low=frame["Low"], close=frame["Close"],
+            name=name,
+            increasing=dict(line=dict(color=UP_COLOR, width=1), fillcolor=UP_COLOR),
+            decreasing=dict(line=dict(color=DOWN_COLOR, width=1), fillcolor=DOWN_COLOR),
+            whiskerwidth=0.8,
+            hoverinfo="x+y",
+        ), row=1, col=1)
+    elif kind == "Area":
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=close,
+            mode="lines",
+            name=name,
+            line=dict(color=line_color, width=1.6, shape="linear"),
+            fill="tozeroy",
+            fillcolor=AREA_FILL_UP if up else AREA_FILL_DOWN,
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ), row=1, col=1)
+    elif kind == "Baseline":
+        baseline = float(ref)
+        base_arr = [baseline] * len(close)
+        above = close.clip(lower=baseline)
+        below = close.clip(upper=baseline)
+        fig.add_trace(go.Scatter(
+            x=x, y=base_arr, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            hoverinfo="skip", showlegend=False,
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=x, y=above, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            fill="tonexty", fillcolor=AREA_FILL_UP,
+            hoverinfo="skip", showlegend=False,
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=x, y=base_arr, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            hoverinfo="skip", showlegend=False,
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=x, y=below, mode="lines",
+            line=dict(width=0, color="rgba(0,0,0,0)"),
+            fill="tonexty", fillcolor=AREA_FILL_DOWN,
+            hoverinfo="skip", showlegend=False,
+        ), row=1, col=1)
+        x_hi, y_hi, x_lo, y_lo = _split_at_baseline(x, close, baseline)
+        fig.add_trace(go.Scatter(
+            x=x_hi, y=y_hi, mode="lines", name=name,
+            line=dict(color=UP_COLOR, width=1.6, shape="linear"),
+            connectgaps=False,
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(
+            x=x_lo, y=y_lo, mode="lines", name=name,
+            line=dict(color=DOWN_COLOR, width=1.6, shape="linear"),
+            connectgaps=False,
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ), row=1, col=1)
+        fig.add_hline(y=baseline, line_color=PREV_CLOSE_COLOR, line_width=1, row=1, col=1)
+    else:
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=close,
+            mode="lines",
+            name=name,
+            line=dict(color=line_color, width=1.6, shape="linear"),
+            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+        ), row=1, col=1)
+
+    if has_volume:
+        fig.add_trace(go.Bar(
+            x=x,
+            y=frame["Volume"],
+            name="Volume",
+            marker_color=volume_bar_colors(frame),
+            marker_line_width=0,
+            opacity=0.9,
+            hovertemplate="Volume: %{y:,.0f}<extra></extra>",
+        ), row=2, col=1)
+
+    ymin = float(close.min())
+    ymax = float(close.max())
+    if kind == "Baseline":
+        ymin = min(ymin, float(ref))
+        ymax = max(ymax, float(ref))
+    pad = (ymax - ymin) * 0.08 if ymax > ymin else max(abs(ymin) * 0.01, 0.5)
+
+    if range_key == "1D":
+        tickformat = "%I:%M %p"
+    elif range_key == "5D":
+        tickformat = "%b %d"
+    else:
+        tickformat = "%b %d"
+
+    apply_market_layout(
+        fig,
+        height=500,
+        tickformat=tickformat,
+        rangebreaks=market_rangebreaks(pd.DatetimeIndex(x), range_key),
+    )
+    fig.update_yaxes(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text="", row=1, col=1)
+    if has_volume:
+        fig.update_xaxes(showticklabels=False, row=1, col=1)
+        fig.update_yaxes(
+            title_text="",
+            showticklabels=False,
+            showgrid=False,
+            showspikes=False,
+            zeroline=False,
+            row=2,
+            col=1,
+        )
+    if range_key == "1D":
+        fig.update_xaxes(dtick=3_600_000)
+    return fig
+
+
+def signed_hbar(df: pd.DataFrame, x_col: str, y_col: str, title: str, x_title: str) -> go.Figure:
+    ordered = df.sort_values(x_col)
+    colors = [UP_COLOR if (pd.notna(v) and v >= 0) else DOWN_COLOR for v in ordered[x_col]]
+    fig = go.Figure(go.Bar(
+        x=ordered[x_col],
+        y=ordered[y_col],
+        orientation="h",
+        marker_color=colors,
+        marker_line_width=0,
+        hovertemplate="%{y}: %{x:+.2f}%<extra></extra>",
+    ))
+    fig.add_vline(x=0, line_color="#b2b5be", line_width=1)
+    fig.update_layout(
+        title=title, height=400, showlegend=False,
+        xaxis_title=x_title, yaxis_title="",
+        margin=dict(l=8, r=12, t=48, b=8),
+        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        font=dict(color="#131722", size=12),
+        bargap=0.28,
+    )
+    fig.update_xaxes(zeroline=True, zerolinecolor="#b2b5be", gridcolor=GRID_COLOR, ticksuffix="%")
+    fig.update_yaxes(showgrid=False)
+    return fig
+
+
+def lookup_snapshot(snap: pd.DataFrame, ticker: str) -> dict:
+    if snap is None or snap.empty:
+        return {}
+    hit = snap[snap["ticker"] == ticker]
+    if hit.empty:
+        return {}
+    return hit.iloc[0].to_dict()
+
+
+def _take_pending(pending_key: str):
+    if pending_key not in st.session_state:
+        return None
+    return st.session_state.pop(pending_key)
+
+
+def apply_pending_nav_pills() -> None:
+    value = _take_pending("_pending_nav_pills")
+    if value is None:
+        return
+    st.session_state.nav_pills = value
+    st.session_state._last_nav_pill = value
+
+
+def apply_pending_idx_switcher() -> None:
+    value = _take_pending("_pending_idx_switcher")
+    if value is not None:
+        st.session_state.idx_switcher = value
+
+
+def apply_pending_markets_tab() -> None:
+    value = _take_pending("_pending_markets_tab")
+    if value is not None:
+        st.session_state.markets_tab = value
+
+
+def apply_pending_learn_tab() -> None:
+    value = _take_pending("_pending_learn_tab")
+    if value is not None:
+        st.session_state.learn_tab = value
+
+
+def apply_pending_widgets() -> None:
+    """Apply queued widget values. Call only before those widgets exist."""
+    apply_pending_nav_pills()
+    apply_pending_idx_switcher()
+    apply_pending_markets_tab()
+    apply_pending_learn_tab()
+
+
+def go_to(nav: str, markets_tab: str | None = None, learn_tab: str | None = None) -> None:
+    st.session_state.nav = nav
+    if nav in TOP_NAV:
+        st.session_state._pending_nav_pills = nav
+        st.session_state.index_full_chart = False
+    if markets_tab:
+        st.session_state._pending_markets_tab = markets_tab
+        st.session_state.markets_tab_persist = markets_tab
+    if learn_tab:
+        st.session_state._pending_learn_tab = learn_tab
+        st.session_state.learn_tab_persist = learn_tab
+
+
+def open_index_page(ticker: str) -> None:
+    st.session_state.selected_symbol = ticker
+    st.session_state.nav = "Index"
+    st.session_state.index_full_chart = False
+    st.session_state._pending_idx_switcher = ticker
+
+
+def on_idx_switch() -> None:
+    picked = st.session_state.get("idx_switcher")
+    if picked in INDEX_META:
+        st.session_state.selected_symbol = picked
+        st.session_state.index_full_chart = False
+
+
+def trailing_return(prices: pd.DataFrame, ticker: str, days: int) -> float:
+    g = prices[prices["ticker"] == ticker].sort_values("date").dropna(subset=["close"])
+    if len(g) < 2:
+        return np.nan
+    last = float(g.iloc[-1]["close"])
+    cutoff = pd.Timestamp(g["date"].max()) - pd.Timedelta(days=days)
+    past = g[pd.to_datetime(g["date"]) <= cutoff]
+    if past.empty:
+        base = float(g.iloc[0]["close"])
+    else:
+        base = float(past.iloc[-1]["close"])
+    if not base:
+        return np.nan
+    return (last / base - 1) * 100
+
+
+def session_bar_stats(frame: pd.DataFrame) -> dict:
+    if frame.empty or not {"Open", "High", "Low", "Close"}.issubset(frame.columns):
+        return {}
+    return {
+        "open": float(frame["Open"].iloc[0]),
+        "high": float(frame["High"].max()),
+        "low": float(frame["Low"].min()),
+        "close": float(frame["Close"].iloc[-1]),
+        "volume": float(pd.to_numeric(frame["Volume"], errors="coerce").sum()) if "Volume" in frame.columns else np.nan,
+    }
+
+
+def add_to_watchlist(ticker: str) -> str:
+    if ticker in INDEX_META:
+        return f"{display_symbol(ticker)} already sits in Indices."
+    current = list(st.session_state.get("watchlist", []))
+    if ticker in current:
+        return f"{ticker} is already on your watchlist."
+    st.session_state.watchlist = current + [ticker]
+    return f"Added {ticker} to Watchlist."
+
+
+def remove_from_watchlist(ticker: str) -> None:
+    st.session_state.watchlist = [t for t in st.session_state.get("watchlist", []) if t != ticker]
+
+
+def normalize_query(query: str) -> str:
+    return re.sub(r"[^A-Za-z0-9&]+", "", query).upper()
+
+
+def resolve_search(query: str) -> dict:
+    q = query.strip()
+    if not q:
+        return {"error": "Type a ticker or company name, for example AAPL or Apple."}
+    compact = normalize_query(q)
+    if compact in INDEX_ALIASES:
+        return {"ticker": INDEX_ALIASES[compact]}
+    upper = q.upper()
+    if upper in UNIVERSE:
+        return {"ticker": upper}
+    lower = q.casefold()
+    exact_name = next((t for t, name in COMPANY_NAMES.items() if name.casefold() == lower), None)
+    if exact_name:
+        return {"ticker": exact_name}
+    matches = [
+        t for t in UNIVERSE
+        if upper in t.upper() or lower in COMPANY_NAMES.get(t, t).casefold()
+    ]
+    index_matches = [
+        yahoo for yahoo, meta in INDEX_META.items()
+        if lower in meta["name"].casefold() or lower in meta["display"].casefold()
+    ]
+    matches = list(dict.fromkeys(index_matches + matches))
+    if len(matches) == 1:
+        return {"ticker": matches[0]}
+    if matches:
+        return {"candidates": matches}
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9.-]{0,9}", q):
+        return {"ticker": upper, "custom": True}
+    return {"error": "No match in the starter list. Try a US ticker such as AAPL, MSFT, or SPX."}
+
+
+def on_search_change() -> None:
+    result = resolve_search(st.session_state.get("nav_search", ""))
+    st.session_state.search_result = result
+    ticker = result.get("ticker")
+    if ticker:
+        st.session_state.selected_symbol = ticker
+        if ticker in INDEX_META:
+            open_index_page(ticker)
+        else:
+            st.session_state.nav = "Home"
+            st.session_state.index_full_chart = False
+
+
+def bind_widget(key: str, persist_key: str, default) -> None:
+    """Keep widget values after the widget unmounts on another page."""
+    if persist_key not in st.session_state:
+        st.session_state[persist_key] = default
+    if key not in st.session_state:
+        st.session_state[key] = st.session_state[persist_key]
+
+
+def remember_chart_range() -> None:
+    if st.session_state.get("chart_range"):
+        st.session_state.chart_range_persist = st.session_state.chart_range
+
+
+def remember_chart_type() -> None:
+    if st.session_state.get("chart_type"):
+        st.session_state.chart_type_persist = st.session_state.chart_type
+
+
+def remember_idx_chart_range() -> None:
+    if st.session_state.get("idx_chart_range"):
+        st.session_state.idx_chart_range_persist = st.session_state.idx_chart_range
+
+
+def remember_idx_chart_type() -> None:
+    if st.session_state.get("idx_chart_type"):
+        st.session_state.idx_chart_type_persist = st.session_state.idx_chart_type
+
+
+def init_state() -> None:
+    st.session_state.setdefault("nav", "Home")
+    st.session_state.setdefault("markets_tab_persist", "Overview")
+    st.session_state.setdefault("learn_tab_persist", "Start here")
+    st.session_state.setdefault("selected_symbol", "AAPL")
+    st.session_state.setdefault("chart_range_persist", "1D")
+    st.session_state.setdefault("chart_type_persist", "Line")
+    if st.session_state.chart_type_persist not in CHART_TYPES:
+        st.session_state.chart_type_persist = "Line"
+    if "chart_range" not in st.session_state:
+        st.session_state.chart_range = st.session_state.chart_range_persist
+    if "chart_type" not in st.session_state:
+        st.session_state.chart_type = st.session_state.chart_type_persist
+    if st.session_state.get("chart_type") not in CHART_TYPES:
+        st.session_state.chart_type = st.session_state.chart_type_persist
+    st.session_state.setdefault("watchlist", ["AAPL", "MCD"])
+    st.session_state.setdefault("search_result", {})
+    st.session_state.setdefault("flash", "")
+    st.session_state.setdefault("analysis_period", "1y")
+    st.session_state.setdefault("index_full_chart", False)
+    st.session_state.setdefault("idx_chart_range_persist", "1D")
+    st.session_state.setdefault("idx_chart_type_persist", "Candle")
+    if st.session_state.idx_chart_type_persist not in CHART_TYPES:
+        st.session_state.idx_chart_type_persist = "Candle"
+
+
+def render_top_nav() -> None:
+    left, right = st.columns([3.6, 1.55], gap="large")
+    with left:
+        brand, pills = st.columns([1.15, 3.4])
+        with brand:
+            st.markdown('<div class="topnav"><div class="brand">StockScope</div></div>', unsafe_allow_html=True)
+        with pills:
+            if "nav_pills" not in st.session_state:
+                st.session_state.nav_pills = st.session_state.nav if st.session_state.nav in TOP_NAV else "Home"
+            picked = st.pills("Section", TOP_NAV, key="nav_pills", label_visibility="collapsed")
+            last_pill = st.session_state.get("_last_nav_pill")
+            if picked and picked != last_pill:
+                st.session_state.nav = picked
+                st.session_state.index_full_chart = False
+                st.session_state._last_nav_pill = picked
+            elif picked and st.session_state.get("nav") in TOP_NAV:
+                st.session_state._last_nav_pill = picked
+    with right:
+        st.text_input(
+            "Search",
+            placeholder="Search",
+            label_visibility="collapsed",
+            key="nav_search",
+            on_change=on_search_change,
+            help="Search a ticker or company in the starter list, or a main US index such as SPX.",
+        )
+    st.markdown('<hr class="nav-rule" />', unsafe_allow_html=True)
+
+    result = st.session_state.get("search_result") or {}
+    if result.get("error") and st.session_state.get("nav_search"):
+        st.caption(result["error"])
+    elif result.get("candidates"):
+        pick_col, go_col = st.columns([4, 1])
+        chosen = pick_col.selectbox(
+            "Matches",
+            options=result["candidates"],
             format_func=ticker_label,
             key="search_candidate_choice",
         )
-        if candidate_button_col.button("设为详情股票", use_container_width=True):
-            st.session_state["detail_ticker"] = candidate
-            st.session_state.pop("search_candidates", None)
-            st.success(f"已选择 {ticker_label(candidate)}。个股详情选择器已更新。")
+        if go_col.button("Open", width="stretch"):
+            st.session_state.selected_symbol = chosen
+            st.session_state.search_result = {"ticker": chosen}
+            if chosen in INDEX_META:
+                open_index_page(chosen)
+            else:
+                st.session_state.nav = "Home"
+                st.session_state.index_full_chart = False
+            st.rerun()
+    if st.session_state.get("flash"):
+        st.caption(st.session_state.flash)
+        st.session_state.flash = ""
 
-if selected_page == "实时看盘":
-    st.header("🔴 实时看盘")
-    st.markdown("这是 StockScope 的核心页面：尝试获取盘中分钟 K 线，查看价格、区间变化和成交量。")
 
+def index_card_title_html(ticker: str) -> str:
+    meta = INDEX_META[ticker]
+    return (
+        '<div class="idx-head-main">'
+        f'<div class="idx-badge" style="background:{meta["badge_bg"]}">{html.escape(meta["badge"])}</div>'
+        "<div>"
+        f'<div class="idx-name">{html.escape(meta["name"])}<span class="idx-ticker">{html.escape(meta["display"])}</span></div>'
+        f'<div class="idx-blurb">{html.escape(meta["blurb"])}</div>'
+        "</div></div>"
+    )
+
+
+def index_card_quote_html(ticker: str, snap_row: dict) -> str:
+    last = snap_row.get("last", np.nan)
+    chg_pct = snap_row.get("chg_pct", np.nan)
+    last_text = "—" if pd.isna(last) else f"{last:,.2f}"
+    return (
+        '<div class="idx-quote">'
+        f'<div class="last-px">{last_text}<span class="last-unit">{html.escape(INDEX_META[ticker]["unit"])}</span></div>'
+        f'<div class="{chg_class(chg_pct)}">{html.escape(format_chg(chg_pct, True))}</div>'
+        "</div>"
+    )
+
+
+def render_index_cards(snap: pd.DataFrame) -> None:
+    cols = st.columns(3, gap="small")
+    for col, ticker in zip(cols, INDEX_ORDER):
+        meta = INDEX_META[ticker]
+        with col:
+            with st.container(border=True):
+                info, plus_col, open_col = st.columns([4.15, 0.55, 0.55])
+                with info:
+                    st.markdown(index_card_title_html(ticker), unsafe_allow_html=True)
+                with plus_col:
+                    if st.button("＋", key=widget_key("idx_add", ticker), help=f"Add {meta['proxy']} (tracks this index) to Watchlist"):
+                        st.session_state.flash = add_to_watchlist(meta["proxy"])
+                        st.rerun()
+                with open_col:
+                    if st.button("↗", key=widget_key("idx_open", ticker), help=f"Open {meta['name']} page"):
+                        open_index_page(ticker)
+                        st.rerun()
+                st.markdown(index_card_quote_html(ticker, lookup_snapshot(snap, ticker)), unsafe_allow_html=True)
+
+
+def watchlist_frame(tickers: Iterable[str], snap: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for ticker in tickers:
+        row = lookup_snapshot(snap, ticker)
+        rows.append({
+            "Symbol": display_symbol(ticker),
+            "Last": row.get("last", np.nan),
+            "Chg": row.get("chg", np.nan),
+            "Chg%": row.get("chg_pct", np.nan),
+            "ticker": ticker,
+        })
+    return pd.DataFrame(rows)
+
+
+def style_watchlist(df: pd.DataFrame) -> pd.DataFrame:
+    def fmt_last(value) -> str:
+        return "—" if pd.isna(value) else f"{value:,.2f}"
+
+    def fmt_chg(value) -> str:
+        return "—" if pd.isna(value) else f"{value:+.2f}"
+
+    def fmt_pct(value) -> str:
+        return "—" if pd.isna(value) else f"{value:+.2f}%"
+
+    return pd.DataFrame({
+        "Symbol": df["Symbol"],
+        "Last": df["Last"].map(fmt_last),
+        "Chg": df["Chg"].map(fmt_chg),
+        "Chg%": df["Chg%"].map(fmt_pct),
+    })
+
+
+def handle_watchlist_selection(event, table: pd.DataFrame) -> None:
+    rows = event.selection.rows if event and getattr(event, "selection", None) else []
+    if not rows or table.empty:
+        return
+    idx = rows[0]
+    if 0 <= idx < len(table):
+        st.session_state.selected_symbol = str(table.iloc[idx]["ticker"])
+
+
+def render_watchlist_panel(snap: pd.DataFrame, *, show_remove: bool = False) -> None:
+    head_l, head_r = st.columns([3, 1])
+    with head_l:
+        st.markdown('<p class="wl-title">Watchlist</p>', unsafe_allow_html=True)
+    with head_r:
+        with st.popover("＋"):
+            add_query = st.text_input("Add ticker", placeholder="MCD", key="wl_add_query")
+            if st.button("Add symbol", key="wl_add_btn", width="stretch"):
+                resolved = resolve_search(add_query)
+                if resolved.get("ticker"):
+                    st.session_state.flash = add_to_watchlist(resolved["ticker"])
+                    st.rerun()
+                else:
+                    st.session_state.flash = resolved.get("error", "Could not add that symbol.")
+                    st.rerun()
+
+    st.markdown('<div class="section-label">Indices</div>', unsafe_allow_html=True)
+    idx_table = watchlist_frame(INDEX_ORDER, snap)
+    idx_event = st.dataframe(
+        style_watchlist(idx_table),
+        width="stretch",
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="wl_indices",
+        height=52 + 36 * len(INDEX_ORDER),
+    )
+    handle_watchlist_selection(idx_event, idx_table)
+
+    st.markdown('<div class="section-label">Stocks</div>', unsafe_allow_html=True)
+    stocks = [t for t in st.session_state.get("watchlist", []) if t not in INDEX_META]
+    if not stocks:
+        st.caption("No stocks yet. Use ＋ to add a beginner-friendly name such as AAPL.")
+    else:
+        stock_table = watchlist_frame(stocks, snap)
+        stock_event = st.dataframe(
+            style_watchlist(stock_table),
+            width="stretch",
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="wl_stocks",
+            height=52 + 36 * max(len(stocks), 1),
+        )
+        handle_watchlist_selection(stock_event, stock_table)
+        if show_remove:
+            drop = st.selectbox("Remove", options=["—"] + stocks, format_func=lambda t: ticker_label(t) if t != "—" else "—")
+            if drop != "—" and st.button("Remove from watchlist"):
+                remove_from_watchlist(drop)
+                st.rerun()
+    st.caption("Click a row to show it on the chart. Quotes via Yahoo Finance; they may be delayed.")
+
+
+def _index_chart_figure(ticker: str, snap: pd.DataFrame, *, tall: bool = False) -> tuple[go.Figure | None, pd.DataFrame]:
+    bind_widget("idx_chart_range", "idx_chart_range_persist", "1D")
+    bind_widget("idx_chart_type", "idx_chart_type_persist", "Candle")
+    st.segmented_control(
+        "Chart type",
+        options=CHART_TYPES,
+        key="idx_chart_type",
+        on_change=remember_idx_chart_type,
+    )
+    st.pills(
+        "Range",
+        list(CHART_RANGES.keys()),
+        key="idx_chart_range",
+        on_change=remember_idx_chart_range,
+        label_visibility="collapsed",
+    )
+    range_key = st.session_state.get("idx_chart_range") or "1D"
+    if range_key not in CHART_RANGES:
+        range_key = "1D"
+    chart_type = st.session_state.get("idx_chart_type") or "Candle"
+    spec = CHART_RANGES[range_key]
+    with st.spinner("Loading index chart…"):
+        series = download_ohlc(ticker, spec["period"], spec["interval"])
+    if series.empty:
+        st.info("No bars for this range yet. Markets may be closed, or Yahoo did not return data.")
+        return None, series
+    quote = lookup_snapshot(snap, ticker)
+    prev_close = None
+    if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")):
+        prev_close = float(quote["last"]) - float(quote["chg"])
+    fig = build_price_chart(series, ticker, chart_type, previous_close=prev_close, range_key=range_key)
+    if tall:
+        fig.update_layout(height=720)
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False, "scrollZoom": True})
+    return fig, series
+
+
+def render_index_page() -> None:
+    apply_pending_idx_switcher()
+    ticker = st.session_state.selected_symbol
+    if ticker not in INDEX_META:
+        ticker = INDEX_ORDER[0]
+        st.session_state.selected_symbol = ticker
+    meta = INDEX_META[ticker]
+    proxy = meta["proxy"]
+
+    needed = tuple(dict.fromkeys([*INDEX_ORDER, proxy, *meta["related"]]))
+    with st.spinner("Loading index quotes…"):
+        try:
+            snap_prices = download_prices(needed, "5d")
+            history = download_prices((ticker,), "5y")
+            peers = download_prices(tuple(INDEX_ORDER), "1y")
+        except Exception:
+            snap_prices, history, peers = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    snap = snapshot_from_prices(snap_prices)
+    quote = lookup_snapshot(snap, ticker)
+
+    if st.session_state.get("index_full_chart"):
+        top_l, top_r = st.columns([3.4, 1])
+        with top_l:
+            st.markdown(
+                f'<p class="quote-name">{html.escape(meta["name"])}'
+                f'<span class="quote-ticker">{html.escape(meta["display"])}</span></p>',
+                unsafe_allow_html=True,
+            )
+        with top_r:
+            if st.button("Exit full chart", key="idx_exit_full", width="stretch"):
+                st.session_state.index_full_chart = False
+                st.rerun()
+        last = quote.get("last", np.nan)
+        chg = quote.get("chg", np.nan)
+        chg_pct = quote.get("chg_pct", np.nan)
+        st.markdown(
+            f'<div class="quote-last">{html.escape(format_last(ticker, last))} '
+            f'<span class="last-unit">{html.escape(meta["unit"].upper())}</span> '
+            f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
+            unsafe_allow_html=True,
+        )
+        _index_chart_figure(ticker, snap, tall=True)
+        st.caption("Full chart uses the same data as the index page. Weekends and closed hours stay hidden. Yahoo Finance; may be delayed.")
+        return
+
+    nav_l, nav_mid, nav_r = st.columns([1.35, 2.5, 2.3])
+    with nav_l:
+        if st.button("Back to home", key="idx_back"):
+            go_to("Home")
+            st.rerun()
+    with nav_mid:
+        if "idx_switcher" not in st.session_state:
+            st.session_state.idx_switcher = ticker if ticker in INDEX_ORDER else INDEX_ORDER[0]
+        st.pills(
+            "Index",
+            INDEX_ORDER,
+            format_func=lambda t: INDEX_META[t]["display"],
+            key="idx_switcher",
+            on_change=on_idx_switch,
+            label_visibility="collapsed",
+        )
+    with nav_r:
+        add_c, full_c = st.columns(2)
+        with add_c:
+            if st.button(f"＋ {proxy}", key="idx_add_proxy", help=f"Add {proxy} to Watchlist", width="stretch"):
+                st.session_state.flash = add_to_watchlist(proxy)
+                st.rerun()
+        with full_c:
+            if st.button("Full chart", key="idx_full_chart", type="primary", width="stretch"):
+                st.session_state.index_full_chart = True
+                st.rerun()
+
+    st.markdown(
+        f'<p class="quote-name">{html.escape(meta["name"])}'
+        f'<span class="quote-ticker">{html.escape(meta["display"])}</span></p>'
+        f'<p class="hero-sub">{html.escape(meta["members"])} · {html.escape(meta["blurb"])}</p>',
+        unsafe_allow_html=True,
+    )
+    last = quote.get("last", np.nan)
+    chg = quote.get("chg", np.nan)
+    chg_pct = quote.get("chg_pct", np.nan)
+    st.markdown(
+        f'<div class="quote-last">{html.escape(format_last(ticker, last))} '
+        f'<span class="last-unit">{html.escape(meta["unit"].upper())}</span> '
+        f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
+        unsafe_allow_html=True,
+    )
+    now_et = pd.Timestamp.now(tz="America/New_York")
+    st.caption(f"{estimated_us_session(now_et)} · quotes via Yahoo Finance, may be delayed.")
+
+    _, series = _index_chart_figure(ticker, snap, tall=False)
+    st.caption("Same four chart types as Home. Closed-market hours are hidden so the line stays continuous.")
+
+    stats = session_bar_stats(series) if series is not None else {}
+    if stats:
+        range_key = st.session_state.get("idx_chart_range") or "1D"
+        window = "Session" if range_key == "1D" else "Range"
+        chips = st.columns(4)
+        labels = [
+            (f"{window} open", stats.get("open")),
+            (f"{window} high", stats.get("high")),
+            (f"{window} low", stats.get("low")),
+            ("Prev close", float(quote["last"]) - float(quote["chg"]) if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")) else np.nan),
+        ]
+        for col, (label, value) in zip(chips, labels):
+            shown = "—" if value is None or pd.isna(value) else f"{value:,.2f}"
+            col.markdown(f'<div class="stat-chip"><div class="k">{label}</div><div class="v">{shown}</div></div>', unsafe_allow_html=True)
+
+    left, right = st.columns([1.15, 1], gap="large")
+    with left:
+        st.markdown("##### What this index is")
+        st.markdown(f'<div class="about-box"><p>{html.escape(meta["about"])}</p></div>', unsafe_allow_html=True)
+
+        st.markdown("##### How it has moved")
+        horizons = [("1 month", 30), ("6 months", 182), ("1 year", 365), ("5 years", 365 * 5)]
+        mcols = st.columns(4)
+        for col, (label, days) in zip(mcols, horizons):
+            value = trailing_return(history, ticker, days) if not history.empty else np.nan
+            col.metric(label, format_chg(value, True) if pd.notna(value) else "—")
+
+        if not history.empty:
+            g = history[history["ticker"] == ticker].sort_values("date")
+            if not g.empty:
+                hi = float(g["close"].max())
+                lo = float(g["close"].min())
+                last_px = float(g["close"].iloc[-1])
+                span = hi - lo
+                pct_pos = 0 if span <= 0 else max(0, min(100, (last_px - lo) / span * 100))
+                st.markdown("##### 5-year range")
+                st.markdown(
+                    f'<div class="range-track"><div class="range-dot" style="left:{pct_pos:.1f}%"></div></div>'
+                    f'<div style="display:flex;justify-content:space-between;color:#6a6d78;font-size:0.82rem">'
+                    f"<span>Low {lo:,.2f}</span><span>Last {last_px:,.2f}</span><span>High {hi:,.2f}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+    with right:
+        st.markdown("##### The other US indices")
+        peer_rows = []
+        for peer in INDEX_ORDER:
+            row = lookup_snapshot(snap, peer)
+            peer_rows.append({
+                "Index": INDEX_META[peer]["display"],
+                "Last": format_last(peer, row.get("last", np.nan)),
+                "Chg%": format_chg(row.get("chg_pct", np.nan), True),
+            })
+        st.dataframe(pd.DataFrame(peer_rows), width="stretch", hide_index=True, height=148)
+
+        if not peers.empty:
+            pivot = peers.pivot_table(index="date", columns="ticker", values="close").dropna(how="all")
+            if not pivot.empty:
+                norm = pivot / pivot.bfill().iloc[0] * 100
+                fig_cmp = go.Figure()
+                colors = {"^GSPC": "#f23645", "^NDX": "#2962ff", "^DJI": "#131722"}
+                for col_name in INDEX_ORDER:
+                    if col_name not in norm.columns:
+                        continue
+                    fig_cmp.add_trace(go.Scatter(
+                        x=norm.index,
+                        y=norm[col_name],
+                        mode="lines",
+                        name=INDEX_META[col_name]["display"],
+                        line=dict(color=colors.get(col_name, "#131722"), width=1.8),
+                    ))
+                fig_cmp.update_layout(
+                    height=260, margin=dict(l=8, r=12, t=8, b=8),
+                    paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+                    hovermode="x unified",
+                    yaxis_title="Start = 100",
+                )
+                fig_cmp.update_xaxes(showgrid=False)
+                fig_cmp.update_yaxes(gridcolor=GRID_COLOR, zeroline=False)
+                restyle_chart(fig_cmp, height=260)
+                st.plotly_chart(fig_cmp, width="stretch", config={"displayModeBar": False})
+                st.caption("Each line starts at 100 one year ago, so you can compare path, not the raw index level.")
+
+        st.markdown("##### Names inside this index")
+        st.caption(f"{proxy} is a fund that tracks {meta['display']}. The names below are well-known members, not a complete list.")
+        rel = st.columns(len(meta["related"]))
+        for col, symbol in zip(rel, meta["related"]):
+            row = lookup_snapshot(snap, symbol)
+            label = f"{symbol} {format_chg(row.get('chg_pct', np.nan), True)}" if not pd.isna(row.get("chg_pct", np.nan)) else symbol
+            if col.button(label, key=f"idx_rel_{symbol}", width="stretch"):
+                st.session_state.selected_symbol = symbol
+                go_to("Home")
+                st.rerun()
+
+    st.markdown("##### How to read this page")
+    st.markdown(
+        "- **Full chart** hides the notes and enlarges the same quote chart.\n"
+        f"- **＋ {proxy}** adds a fund that follows this index to your watchlist. You cannot buy the index itself.\n"
+        "- Header change is versus the **previous close**, not versus the left edge of the chart.\n"
+        "- This is a classroom summary, not a trading terminal."
+    )
+
+
+def render_home() -> None:
+    st.markdown(
+        '<div class="hero-title">Stock market for beginner.</div>'
+        '<p class="hero-sub">US stock market main indices</p>',
+        unsafe_allow_html=True,
+    )
+
+    selected = st.session_state.selected_symbol
+    needed = tuple(dict.fromkeys([*INDEX_ORDER, *st.session_state.get("watchlist", []), selected]))
+    with st.spinner("Updating quotes…"):
+        try:
+            prices = download_prices(needed, "5d")
+        except Exception:
+            prices = pd.DataFrame()
+    snap = snapshot_from_prices(prices)
+    render_index_cards(snap)
+
+    chart_col, list_col = st.columns([2.35, 1], gap="large")
+    with chart_col:
+        render_selected_chart(selected, snap)
+    with list_col:
+        render_watchlist_panel(snap, show_remove=False)
+
+
+def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
+    quote = lookup_snapshot(snap, ticker)
+    title_l, type_col, help_col, add_col = st.columns([2.05, 3.05, 0.7, 0.75])
+    with title_l:
+        st.markdown(
+            f'<p class="quote-name">{html.escape(company_name(ticker))}'
+            f'<span class="quote-ticker">{html.escape(display_symbol(ticker))}</span></p>',
+            unsafe_allow_html=True,
+        )
+    with type_col:
+        st.segmented_control(
+            "Chart type",
+            options=CHART_TYPES,
+            key="chart_type",
+            on_change=remember_chart_type,
+        )
+    with help_col:
+        with st.popover("Help"):
+            st.markdown(
+                """
+                **How to read this chart** (Microsoft Edge / MSN Money style)
+                - **Line** — last price only, no fill.
+                - **Candle** — open / high / low / close for each bar.
+                - **Area** — line with a fill down to the bottom of the pane (green if up vs previous close).
+                - **Baseline** — green above the baseline, red below. Baseline is the previous close when known, otherwise the first price in this range.
+                - **Nights, weekends, and US holidays are hidden**, so the line stays continuous instead of stretching across closed hours.
+                - Thin **green / red volume** sits at the bottom of the same pane.
+                - The **price scale is zoomed to this range**, not to zero — a small move can look tall.
+                - Header change is versus the **previous close**, not versus the left edge of the chart.
+                - Figures come from Yahoo Finance and may be delayed. This is not a trading terminal.
+                """
+            )
+    with add_col:
+        if st.button("Add ＋", key="chart_add", help="Add this symbol to Watchlist", type="secondary"):
+            st.session_state.flash = add_to_watchlist(ticker)
+            st.rerun()
+
+    last = quote.get("last", np.nan)
+    chg = quote.get("chg", np.nan)
+    chg_pct = quote.get("chg_pct", np.nan)
+    unit = INDEX_META[ticker]["unit"].upper() if is_index(ticker) else "USD"
+    last_html = "—" if pd.isna(last) else (
+        f"{last:,.2f}" if is_index(ticker) else f"${last:,.2f}"
+    )
+    st.markdown(
+        f'<div class="quote-last">{last_html} <span class="last-unit">{html.escape(unit)}</span> '
+        f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    st.pills(
+        "Range",
+        list(CHART_RANGES.keys()),
+        key="chart_range",
+        on_change=remember_chart_range,
+        label_visibility="collapsed",
+    )
+
+    range_key = st.session_state.get("chart_range") or st.session_state.get("chart_range_persist") or "1D"
+    if range_key not in CHART_RANGES:
+        range_key = "1D"
+    spec = CHART_RANGES[range_key]
+    with st.spinner("Loading chart…"):
+        series = download_ohlc(ticker, spec["period"], spec["interval"])
+    if series.empty:
+        st.info("No bars for this range yet. Markets may be closed, or Yahoo did not return data.")
+    else:
+        prev_close = None
+        if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")):
+            prev_close = float(quote["last"]) - float(quote["chg"])
+        fig = build_price_chart(
+            series,
+            ticker,
+            st.session_state.get("chart_type") or st.session_state.get("chart_type_persist") or "Line",
+            previous_close=prev_close,
+            range_key=range_key,
+        )
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        as_of = to_new_york_time(series.index[-1])
+        st.caption(
+            f"Range {range_key} · last bar {as_of.strftime('%Y-%m-%d %H:%M %Z')}. "
+            "Regular US hours only — nights, weekends, and holidays are hidden so the line stays continuous. "
+            "Yahoo Finance / yfinance; may be delayed."
+        )
+    if st.button("Open stock details"):
+        go_to("Markets", markets_tab="Stock")
+        st.rerun()
+
+
+def load_universe(period: str) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    with st.spinner("Loading the starter universe from Yahoo Finance…"):
+        try:
+            prices = download_prices(tuple(UNIVERSE.keys()), period)
+            error = ""
+        except Exception as exc:
+            prices = pd.DataFrame()
+            error = str(exc)
+    metrics = calculate_metrics(prices) if not prices.empty else pd.DataFrame()
+    if not prices.empty:
+        daily = snapshot_from_prices(prices).rename(columns={
+            "ticker": "Ticker", "chg_pct": "Day chg (%)", "last": "Last close",
+        })
+        if not metrics.empty:
+            metrics = metrics.drop(columns=["Last"], errors="ignore").merge(
+                daily[["Ticker", "Last close", "Day chg (%)"]],
+                on="Ticker",
+                how="left",
+            )
+            metrics = metrics.rename(columns={"Last close": "Last"})
+    return prices, metrics, error
+
+
+def remember_markets_tab() -> None:
+    if st.session_state.get("markets_tab"):
+        st.session_state.markets_tab_persist = st.session_state.markets_tab
+
+
+def render_markets() -> None:
+    apply_pending_markets_tab()
+    bind_widget("markets_tab", "markets_tab_persist", "Overview")
+    st.segmented_control("Markets", options=MARKET_TABS, key="markets_tab", on_change=remember_markets_tab)
+    tab = st.session_state.markets_tab
+
+    if tab == "Live quotes":
+        render_live_quotes()
+        return
+    if tab == "Stock":
+        render_stock_details()
+        return
+
+    period = st.selectbox(
+        "Look-back window",
+        options=list(PERIOD_LABELS.keys()),
+        format_func=lambda x: PERIOD_LABELS[x],
+        key="analysis_period",
+    )
+    sector_options = ["All groups"] + sorted(set(UNIVERSE.values()))
+    selected_sector = st.selectbox("Group filter", options=sector_options, index=0)
+
+    prices, metrics, load_error = load_universe(period)
+    if prices.empty:
+        st.error("Could not load daily history. Check the network or Yahoo Finance, then retry.")
+        if load_error:
+            st.code(load_error)
+        return
+
+    if selected_sector != "All groups":
+        metrics_view = metrics[metrics["Group"] == selected_sector].copy()
+        active_tickers = [t for t, s in UNIVERSE.items() if s == selected_sector]
+    else:
+        metrics_view = metrics.copy()
+        active_tickers = list(UNIVERSE.keys())
+    prices_active = prices[prices["ticker"].isin(active_tickers)].copy()
+
+    if tab == "Overview":
+        render_overview(prices, prices_active, metrics, metrics_view, period)
+    elif tab == "Screener":
+        render_screener(metrics_view)
+    elif tab == "Returns & risk":
+        render_risk(prices, metrics, period)
+
+
+def render_overview(
+    prices: pd.DataFrame,
+    prices_active: pd.DataFrame,
+    metrics: pd.DataFrame,
+    metrics_view: pd.DataFrame,
+    period: str,
+) -> None:
+    latest_date = prices["date"].max().date()
+    loaded_tickers = prices["ticker"].nunique()
+    positive_share = (metrics["Period return (%)"] > 0).mean() * 100 if not metrics.empty else np.nan
+    median_vol = metrics["Ann. volatility (%)"].median() if not metrics.empty else np.nan
+    mean_return = metrics["Period return (%)"].mean() if not metrics.empty else np.nan
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Symbols loaded", f"{loaded_tickers}", help="Starter watch universe, not the whole US market.")
+    k2.metric(f"Average return · {PERIOD_LABELS[period]}", pct(mean_return))
+    k3.metric("Share with a positive return", pct(positive_share))
+    k4.metric("Median annualized volatility", pct(median_vol))
+    st.caption(f"As of {latest_date} · {PERIOD_LABELS[period]} · {len(UNIVERSE)} starter symbols")
+
+    left, right = st.columns([1.15, 0.85], gap="large")
+    with left:
+        fig_heat = make_monthly_sector_heatmap(prices_active)
+        if fig_heat is not None:
+            st.plotly_chart(fig_heat, width="stretch", config={"displayModeBar": False})
+        else:
+            st.info("Not enough history in this window to draw the monthly heatmap.")
+    with right:
+        ranked = metrics_view.sort_values("Period return (%)", ascending=False).head(15)
+        fig_rank = signed_hbar(ranked, "Period return (%)", "Ticker", "Top 15 in this window", "Period return")
+        st.plotly_chart(fig_rank, width="stretch", config={"displayModeBar": False})
+
+    st.subheader("Today's movers in the starter list")
+    stocks_only = metrics[~metrics["Ticker"].isin(["SPY", "QQQ", "DIA"])].copy()
+    valid_daily = stocks_only["Day chg (%)"].dropna() if "Day chg (%)" in stocks_only.columns else pd.Series(dtype=float)
+    breadth = st.columns(4)
+    breadth[0].metric("Stocks watched", f"{len(stocks_only)}")
+    breadth[1].metric("Up", f"{int((valid_daily > 0).sum())}")
+    breadth[2].metric("Down", f"{int((valid_daily < 0).sum())}")
+    breadth[3].metric("Flat", f"{int((valid_daily == 0).sum())}")
+
+    movers_left, movers_right = st.columns(2, gap="large")
+    with movers_left:
+        if "Day chg (%)" in stocks_only.columns:
+            gainers = stocks_only.dropna(subset=["Day chg (%)"]).nlargest(10, "Day chg (%)")
+        else:
+            gainers = pd.DataFrame()
+        if not gainers.empty:
+            fig_gainers = signed_hbar(gainers, "Day chg (%)", "Ticker", "Gainers · top 10", "Day change")
+            st.plotly_chart(fig_gainers, width="stretch", config={"displayModeBar": False})
+        else:
+            st.info("Not enough data for a gainer list.")
+    with movers_right:
+        if "Day chg (%)" in stocks_only.columns:
+            losers = stocks_only.dropna(subset=["Day chg (%)"]).nsmallest(10, "Day chg (%)")
+        else:
+            losers = pd.DataFrame()
+        if not losers.empty:
+            fig_losers = signed_hbar(losers, "Day chg (%)", "Ticker", "Losers · bottom 10", "Day change")
+            st.plotly_chart(fig_losers, width="stretch", config={"displayModeBar": False})
+        else:
+            st.info("Not enough data for a loser list.")
+
+    st.markdown("#### Volume leaders")
+    volume_rank = stocks_only.dropna(subset=["Volume"]).nlargest(10, "Volume")
+    if not volume_rank.empty:
+        ordered = volume_rank.sort_values("Volume")
+        day_chg = ordered["Day chg (%)"] if "Day chg (%)" in ordered.columns else pd.Series(0, index=ordered.index)
+        colors = [UP_COLOR if pd.notna(v) and v >= 0 else DOWN_COLOR for v in day_chg]
+        fig_volume_rank = go.Figure(go.Bar(
+            x=ordered["Volume"], y=ordered["Ticker"], orientation="h",
+            marker_color=colors, marker_line_width=0,
+            hovertemplate="%{y}: %{x:,.0f} shares<extra></extra>",
+        ))
+        fig_volume_rank.update_layout(
+            title="Highest volume in the latest session",
+            height=410, xaxis_title="Shares", yaxis_title="",
+            margin=dict(l=8, r=12, t=48, b=8),
+            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+            showlegend=False,
+        )
+        fig_volume_rank.update_xaxes(tickformat="~s", gridcolor=GRID_COLOR)
+        fig_volume_rank.update_yaxes(showgrid=False)
+        st.plotly_chart(fig_volume_rank, width="stretch", config={"displayModeBar": False})
+
+    st.subheader("Starter universe")
+    table_cols = ["Ticker", "Company", "Group", "Last", "Period return (%)", "Ann. volatility (%)", "Max drawdown (%)", "Avg volume", "Volume", "As of"]
+    display_metrics = metrics_view.sort_values("Period return (%)", ascending=False)
+    display_metrics = display_metrics[[c for c in table_cols if c in display_metrics.columns]]
+    st.dataframe(
+        display_metrics,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Last": st.column_config.NumberColumn(format="$%.2f"),
+            "Period return (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Ann. volatility (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Max drawdown (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Avg volume": st.column_config.NumberColumn(format="%.0f"),
+            "Volume": st.column_config.NumberColumn(format="%.0f"),
+        },
+    )
+    st.download_button(
+        "Download this table as CSV",
+        data=display_metrics.to_csv(index=False).encode("utf-8-sig"),
+        file_name="stockscope_universe.csv",
+        mime="text/csv",
+    )
+
+
+def render_screener(metrics_view: pd.DataFrame) -> None:
+    st.subheader("Narrow the starter list by return and risk")
+    fc1, fc2, fc3 = st.columns(3)
+    min_return = fc1.slider("Minimum period return (%)", min_value=-100, max_value=200, value=-100, step=5)
+    max_vol = fc2.slider("Maximum annualized volatility (%)", min_value=0, max_value=150, value=150, step=5)
+    sort_by = fc3.selectbox(
+        "Sort by",
+        ["Period return (%)", "Ann. volatility (%)", "Max drawdown (%)", "Avg volume"],
+        index=0,
+    )
+    filtered = metrics_view[
+        (metrics_view["Period return (%)"].fillna(-999) >= min_return)
+        & (metrics_view["Ann. volatility (%)"].fillna(999) <= max_vol)
+    ].copy()
+    ascending = sort_by in ["Ann. volatility (%)", "Max drawdown (%)"]
+    filtered = filtered.sort_values(sort_by, ascending=ascending)
+    st.write(f"Symbols that match: **{len(filtered)}**")
+    st.dataframe(
+        filtered,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Last": st.column_config.NumberColumn(format="$%.2f"),
+            "Day chg (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Period return (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Ann. volatility (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Max drawdown (%)": st.column_config.NumberColumn(format="%.2f%%"),
+            "Avg volume": st.column_config.NumberColumn(format="%.0f"),
+            "Volume": st.column_config.NumberColumn(format="%.0f"),
+        },
+    )
+    st.download_button(
+        "Download screener CSV",
+        data=filtered.to_csv(index=False).encode("utf-8-sig"),
+        file_name="stockscope_filtered_stocks.csv",
+        mime="text/csv",
+    )
+    st.markdown(
+        "**What the numbers mean:** period return uses the first and last valid close in the window; "
+        "annualized volatility is the daily-return standard deviation × √252; "
+        "max drawdown is the worst drop from a peak close."
+    )
+
+
+def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> None:
+    st.subheader("Compare return and volatility")
+    default = [t for t in ["AAPL", "MSFT", "NVDA", "SPY"] if t in UNIVERSE]
+    compare_tickers = st.multiselect(
+        "Symbols to compare",
+        options=list(UNIVERSE.keys()),
+        default=default,
+        format_func=ticker_label,
+        help="Up to about eight names keeps the chart readable.",
+    )
+    if not compare_tickers:
+        st.info("Pick at least one symbol.")
+        return
+    compare_data = prices[prices["ticker"].isin(compare_tickers)].copy()
+    if compare_data.empty:
+        st.warning("No history for those symbols in this window.")
+        return
+    normalized = compare_data.sort_values("date").copy()
+    normalized["Indexed (start = 100)"] = normalized.groupby("ticker")["close"].transform(
+        lambda s: s / s.dropna().iloc[0] * 100 if not s.dropna().empty else s
+    )
+    fig_line = px.line(
+        normalized, x="date", y="Indexed (start = 100)", color="ticker",
+        title=f"Rebased performance · {PERIOD_LABELS[period]}",
+        labels={"date": "Date", "ticker": "Ticker", "Indexed (start = 100)": "Rebased (start = 100)"},
+    )
+    fig_line.add_hline(y=100, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
+    fig_line.update_layout(
+        height=470, hovermode="x unified",
+        yaxis_title="Rebased level (start of window = 100)",
+        xaxis_title="Date",
+        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        legend_title_text="Ticker",
+    )
+    fig_line.update_xaxes(showgrid=False)
+    fig_line.update_yaxes(gridcolor=GRID_COLOR, zeroline=False, side="right")
+    st.plotly_chart(fig_line, width="stretch", config={"displayModeBar": False})
+    st.caption("This is not the share price. Each series is rebased to 100 at the start of the window so you can compare percentage paths.")
+    scat = metrics[metrics["Ticker"].isin(compare_tickers)].copy()
+    if not scat.empty:
+        fig_scatter = px.scatter(
+            scat, x="Ann. volatility (%)", y="Period return (%)", color="Group", text="Ticker",
+            hover_data={"Last": ":.2f", "Max drawdown (%)": ":.2f", "Avg volume": ":,.0f"},
+            title="Return vs risk",
+        )
+        fig_scatter.update_traces(textposition="top center", marker={"size": 12, "opacity": 0.8})
+        fig_scatter.add_hline(y=0, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
+        fig_scatter.update_layout(
+            height=450, xaxis_title="Ann. volatility (%)", yaxis_title="Period return (%)",
+            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        )
+        fig_scatter.update_xaxes(gridcolor=GRID_COLOR)
+        fig_scatter.update_yaxes(gridcolor=GRID_COLOR, zeroline=True, zerolinecolor="#b2b5be")
+        st.plotly_chart(fig_scatter, width="stretch", config={"displayModeBar": False})
+    st.caption("Past return and volatility describe history. They are not a forecast.")
+
+
+def render_stock_details() -> None:
+    options = list(dict.fromkeys([
+        st.session_state.selected_symbol,
+        *INDEX_ORDER,
+        *UNIVERSE.keys(),
+    ]))
+    if st.session_state.selected_symbol not in options:
+        options.insert(0, st.session_state.selected_symbol)
+    focus = st.selectbox(
+        "Symbol",
+        options=options,
+        format_func=ticker_label,
+        index=options.index(st.session_state.selected_symbol) if st.session_state.selected_symbol in options else 0,
+        key="stock_focus",
+    )
+    st.session_state.selected_symbol = focus
+    st.subheader(f"{company_name(focus)} · {display_symbol(focus)}")
+    st.caption(UNIVERSE.get(focus, INDEX_META.get(focus, {}).get("blurb", "Custom symbol")))
+
+    period = st.selectbox("History window", options=list(PERIOD_LABELS.keys()), index=3, format_func=lambda x: PERIOD_LABELS[x], key="stock_period")
+    with st.spinner("Loading this symbol…"):
+        one_prices = download_prices((focus,), period)
+        series = download_ohlc(focus, period, "1d")
+    if one_prices.empty and series.empty:
+        st.warning("Yahoo did not return history for this symbol.")
+        return
+    metrics = calculate_metrics(one_prices) if not one_prices.empty else pd.DataFrame()
+    m = metrics.iloc[0] if not metrics.empty else pd.Series(dtype=object)
+    a, b, c, dcol = st.columns(4)
+    a.metric("Last close", format_last(focus, m.get("Last", np.nan)))
+    b.metric("Period return", pct(m.get("Period return (%)", np.nan)))
+    c.metric("Ann. volatility", pct(m.get("Ann. volatility (%)", np.nan)))
+    dcol.metric("Max drawdown", pct(m.get("Max drawdown (%)", np.nan)))
+
+    if not series.empty:
+        prev_close = None
+        if isinstance(m, pd.Series) and pd.notna(m.get("Last")) and "Day chg (%)" in m.index and pd.notna(m.get("Day chg (%)")):
+            last_px = float(m["Last"])
+            prev_close = last_px / (1 + float(m["Day chg (%)"]) / 100) if float(m["Day chg (%)"]) != -100 else None
+        price_fig = build_price_chart(series, focus, "Candle", previous_close=prev_close, range_key="1Y")
+        st.plotly_chart(price_fig, width="stretch", config={"displayModeBar": False})
+        st.caption("Daily OHLC candles. Weekends and holidays are hidden. Green = close ≥ open. Scale is zoomed to this window.")
+
+    add_col, live_col = st.columns(2)
+    if add_col.button("Add to watchlist", width="stretch"):
+        st.session_state.flash = add_to_watchlist(focus)
+        st.rerun()
+    if live_col.button("Open live quotes", width="stretch"):
+        go_to("Markets", markets_tab="Live quotes")
+        st.rerun()
+
+    with st.expander("Optional Yahoo fundamentals (often incomplete)", expanded=False):
+        with st.spinner("Reading fundamentals…"):
+            info = get_ticker_info(focus)
+        fundamental_fields = [
+            ("marketCap", "Market cap", money),
+            ("trailingPE", "P/E (TTM)", lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
+            ("forwardPE", "Forward P/E", lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
+            ("priceToBook", "Price / book", lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
+            ("revenueGrowth", "Revenue growth", lambda x: pct(x * 100) if pd.notna(x) else "—"),
+            ("profitMargins", "Profit margin", lambda x: pct(x * 100) if pd.notna(x) else "—"),
+            ("returnOnEquity", "Return on equity", lambda x: pct(x * 100) if pd.notna(x) else "—"),
+            ("totalRevenue", "Revenue", money),
+            ("freeCashflow", "Free cash flow", money),
+            ("fiftyTwoWeekHigh", "52-week high", lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
+            ("fiftyTwoWeekLow", "52-week low", lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
+        ]
+        if not info:
+            st.warning("Yahoo did not return fundamentals. Price and volume still work.")
+        else:
+            fundamental_rows = []
+            for key, label, formatter in fundamental_fields:
+                value = info.get(key)
+                try:
+                    val_num = float(value) if value is not None else np.nan
+                    shown = formatter(val_num)
+                except (ValueError, TypeError):
+                    shown = "—"
+                fundamental_rows.append({"Field": label, "Value": shown})
+            st.dataframe(pd.DataFrame(fundamental_rows), width="stretch", hide_index=True)
+            st.caption("Confirm anything important in company filings. Yahoo fields vary by name and update schedule.")
+
+
+def render_live_quotes() -> None:
+    st.subheader("Live quotes")
+    st.markdown("Intraday bars for one symbol, plus a short watchlist. This is a classroom feed, not an execution quote.")
+
+    universe_options = list(dict.fromkeys([st.session_state.selected_symbol, *UNIVERSE.keys()]))
+    default_live = st.session_state.selected_symbol if st.session_state.selected_symbol in universe_options else "AAPL"
     live_controls = st.columns([1.5, 1, 1.2, 1.4, 1.1])
     live_ticker = live_controls[0].selectbox(
-        "看盘股票",
-        options=list(UNIVERSE.keys()),
-        index=list(UNIVERSE.keys()).index(st.session_state.get("live_ticker", "NVDA")),
+        "Symbol",
+        options=universe_options,
+        index=universe_options.index(default_live) if default_live in universe_options else 0,
         format_func=ticker_label,
         key="live_ticker",
     )
+    st.session_state.selected_symbol = live_ticker
     live_interval = live_controls[1].selectbox(
-        "K 线周期",
+        "Bar size",
         options=["1m", "5m", "15m", "30m", "60m"],
         index=0,
-        format_func=lambda x: {"1m": "1 分钟", "5m": "5 分钟", "15m": "15 分钟", "30m": "30 分钟", "60m": "60 分钟"}[x],
+        format_func=lambda x: {"1m": "1 min", "5m": "5 min", "15m": "15 min", "30m": "30 min", "60m": "60 min"}[x],
         key="live_interval",
     )
     refresh_label = live_controls[2].selectbox(
-        "自动刷新",
-        options=["手动刷新", "每 15 秒", "每 30 秒", "每 60 秒"],
+        "Auto refresh",
+        options=["Manual", "Every 15s", "Every 30s", "Every 60s"],
         index=2,
         key="live_refresh_mode",
     )
-    refresh_seconds = {"手动刷新": None, "每 15 秒": 15, "每 30 秒": 30, "每 60 秒": 60}[refresh_label]
-    include_extended = live_controls[3].checkbox("包含盘前/盘后", value=True, key="live_extended")
-    if live_controls[4].button("↻ 立即刷新", use_container_width=True, key="live_force_refresh"):
+    refresh_seconds = {"Manual": None, "Every 15s": 15, "Every 30s": 30, "Every 60s": 60}[refresh_label]
+    include_extended = live_controls[3].checkbox("Include pre/post", value=True, key="live_extended")
+    if live_controls[4].button("↻ Refresh now", width="stretch", key="live_force_refresh"):
         download_intraday_one.clear()
         st.rerun()
 
+    default_watch = [t for t in st.session_state.get("watchlist", ["AAPL", "MCD"]) if t in UNIVERSE][:6]
     live_watchlist = st.multiselect(
-        "同时监控的自选股（建议不超过 6 只，减少数据请求）",
+        "Also watch (keep to six names to limit requests)",
         options=list(UNIVERSE.keys()),
-        default=[t for t in st.session_state.get("watchlist", ["NVDA", "AAPL", "MSFT", "SPY"]) if t in UNIVERSE][:6],
+        default=default_watch,
         format_func=ticker_label,
         key="live_watchlist",
-        help="该表展示各股票最新返回的分钟 K 线，并非逐笔实时成交。",
+        help="Each row is the latest returned minute bar, not a time-and-sales print.",
     )
-
     interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "60m": 60}
     st.info(
-        "数据说明：刷新频率代表应用重新请求数据的频率，不代表行情一定实时或固定延迟 15 分钟。"
-        "Yahoo Finance/yfinance 可能延迟、缺失或限流；此功能用于观察和课程原型，不用于交易执行。"
+        "Refresh is how often this app asks again. It is not a promise of a live or 15-minute-delayed feed. "
+        "Yahoo / yfinance can lag, skip bars, or throttle."
     )
 
     @st.fragment(run_every=refresh_seconds)
     def render_live_monitor(selected_symbol: str, selected_interval: str, extended: bool, watchlist_symbols: list[str]):
         now_et = pd.Timestamp.now(tz="America/New_York")
         st.caption(
-            f"当前美东时间：{now_et.strftime('%Y-%m-%d %H:%M:%S %Z')} · "
-            f"时段参考：{estimated_us_session(now_et)} · 自动刷新：{refresh_label}。"
-            "时段估算未核对交易所假日。"
+            f"New York time: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')} · "
+            f"{estimated_us_session(now_et)} · auto refresh: {refresh_label}. "
+            "The session label does not check exchange holidays."
         )
-
         try:
             intraday = download_intraday_one(selected_symbol, selected_interval, extended)
         except Exception as exc:
-            st.error("暂时无法获取该股票的分钟行情。可能是网络、Yahoo Finance 接口或请求频率限制导致。")
-            with st.expander("查看技术错误信息"):
+            st.error("Could not load minute bars. Network, Yahoo, or rate limits are the usual causes.")
+            with st.expander("Technical error"):
                 st.code(str(exc))
             intraday = pd.DataFrame()
 
         if intraday.empty:
             st.warning(
-                f"{selected_symbol} 当前没有返回 {selected_interval} 分钟数据。"
-                "如果现在不是美股交易时段，可能需要等到下一个交易日再测试；也可以关闭盘前/盘后选项后重试。"
+                f"{selected_symbol} did not return {selected_interval} bars. "
+                "If the US session is closed, wait for the next trading day, or turn off pre/post and retry."
             )
         else:
             valid = intraday.dropna(subset=["Close"]).copy()
@@ -432,82 +2117,54 @@ if selected_page == "实时看盘":
             last_volume = float(last["Volume"]) if pd.notna(last["Volume"]) else np.nan
             stale_threshold = max(3.0, interval_minutes[selected_interval] * 2.0)
             if age_minutes < 0:
-                status_text = "最新 K 线时间戳略晚于本机取时；请结合下一次刷新复核"
+                status_text = "Latest bar timestamp is slightly ahead of this clock; check again on the next refresh"
             elif age_minutes <= stale_threshold:
-                status_text = "最新 K 线时间戳接近当前时间（不构成实时性或延迟保证）"
+                status_text = "Latest bar timestamp is close to now (not a live-data guarantee)"
             else:
-                status_text = "最新 K 线时间较旧；可能是休市、盘前盘后结束或接口未更新"
+                status_text = "Latest bar looks stale; the session may be closed or the feed may have paused"
             st.caption(
-                f"数据状态：{status_text} · 最新 K 线时间：{last_ts_et.strftime('%Y-%m-%d %H:%M:%S %Z')} · "
-                f"与当前时间戳相差约 {age_minutes:.1f} 分钟。"
+                f"{status_text} · bar time {last_ts_et.strftime('%Y-%m-%d %H:%M:%S %Z')} · "
+                f"about {age_minutes:.1f} minutes from this clock."
             )
-
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("最新返回价格", f"${last_close:,.2f}", help="分钟 K 线的 Close，不是逐笔成交价。")
-            m2.metric(
-                "较上一根 K 线",
-                f"{bar_change:+.2f}%" if pd.notna(bar_change) else "—",
-                help="当前最后一根 K 线收盘价相对上一根 K 线收盘价的变化。",
+            m1.metric("Last returned price", f"${last_close:,.2f}", help="Close of the minute bar, not a trade print.")
+            m2.metric("Vs previous bar", f"{bar_change:+.2f}%" if pd.notna(bar_change) else "—")
+            m3.metric("Bar volume", f"{last_volume:,.0f}" if pd.notna(last_volume) else "—")
+            m4.metric("Bars returned", f"{len(valid):,}")
+
+            live_fig = build_price_chart(valid, selected_symbol, "Candle", range_key="1D")
+            st.plotly_chart(live_fig, width="stretch", config={"displayModeBar": False})
+            st.caption(
+                "Intraday OHLC candles on regular US hours only (nights hidden). "
+                "Green = that bar closed ≥ open. This is a classroom feed, not an exchange plot."
             )
-            m3.metric("最新一根 K 线成交量", f"{last_volume:,.0f}" if pd.notna(last_volume) else "—")
-            m4.metric("返回 K 线数量", f"{len(valid):,}")
 
-            chart_left, chart_right = st.columns([1.6, 1], gap="large")
-            with chart_left:
-                candle = go.Figure(data=[go.Candlestick(
-                    x=valid.index,
-                    open=valid["Open"], high=valid["High"], low=valid["Low"], close=valid["Close"],
-                    name=selected_symbol,
-                )])
-                candle.update_layout(
-                    title=f"{selected_symbol} · {selected_interval} 分钟 K 线",
-                    height=480,
-                    margin=dict(l=5, r=5, t=55, b=5),
-                    xaxis_title="时间（Yahoo 返回时区）",
-                    yaxis_title="价格（美元）",
-                    xaxis_rangeslider_visible=False,
-                    hovermode="x unified",
-                )
-                st.plotly_chart(candle, use_container_width=True, key=f"live_candle_{selected_symbol}_{selected_interval}")
-            with chart_right:
-                volume_figure = go.Figure(data=[go.Bar(x=valid.index, y=valid["Volume"], name="成交量")])
-                volume_figure.update_layout(
-                    title="每根 K 线成交量",
-                    height=480,
-                    margin=dict(l=5, r=5, t=55, b=5),
-                    xaxis_title="时间（Yahoo 返回时区）",
-                    yaxis_title="成交量",
-                    hovermode="x unified",
-                )
-                st.plotly_chart(volume_figure, use_container_width=True, key=f"live_volume_{selected_symbol}_{selected_interval}")
-
-            with st.expander("查看最新分钟数据明细", expanded=False):
+            with st.expander("Latest minute rows", expanded=False):
                 detail = valid.tail(30).copy()
-                detail.index.name = "时间（Yahoo 返回时区）"
-                st.dataframe(detail.sort_index(ascending=False), use_container_width=True)
+                detail.index.name = "Time"
+                st.dataframe(detail.sort_index(ascending=False), width="stretch")
                 st.download_button(
-                    "下载当前股票分钟数据 CSV",
+                    "Download minute CSV",
                     data=detail.reset_index().to_csv(index=False).encode("utf-8-sig"),
                     file_name=f"{selected_symbol}_{selected_interval}_intraday.csv",
                     mime="text/csv",
                     key=f"download_live_{selected_symbol}_{selected_interval}",
                 )
 
-        st.markdown("### 自选股盘中监控")
+        st.markdown("### Watchlist bars")
         if not watchlist_symbols:
-            st.info("请在上方选择至少一只股票，查看其最新返回的分钟 K 线。")
+            st.info("Pick at least one extra symbol above.")
         else:
             records = []
-            # Keep requests bounded. One selected chart plus up to six watchlist symbols.
             symbols = list(dict.fromkeys(watchlist_symbols[:6]))
             for symbol in symbols:
                 try:
                     bars = download_intraday_one(symbol, selected_interval, extended)
                     if bars.empty:
                         records.append({
-                            "代码": symbol, "公司": COMPANY_NAMES.get(symbol, symbol), "最新返回价格": np.nan,
-                            "较上一根 K 线 (%)": np.nan, "最新 K 线成交量": np.nan, "最新 K 线时间（美东）": "无数据",
-                            "时间戳差值（分钟）": np.nan, "状态": "无数据",
+                            "Ticker": symbol, "Company": COMPANY_NAMES.get(symbol, symbol),
+                            "Last": np.nan, "Bar chg (%)": np.nan, "Bar volume": np.nan,
+                            "Bar time (ET)": "No data", "Age (min)": np.nan, "Status": "No data",
                         })
                         continue
                     bars = bars.dropna(subset=["Close"]).sort_index()
@@ -517,423 +2174,181 @@ if selected_page == "实时看盘":
                     age = (now - latest_time).total_seconds() / 60
                     previous = float(bars["Close"].iloc[-2]) if len(bars) >= 2 else np.nan
                     change = (float(latest["Close"]) / previous - 1) * 100 if pd.notna(previous) and previous else np.nan
-                    status = "时间戳较新" if 0 <= age <= max(3, interval_minutes[selected_interval] * 2) else "需核实更新状态"
+                    status = "Fresh timestamp" if 0 <= age <= max(3, interval_minutes[selected_interval] * 2) else "Check update status"
                     records.append({
-                        "代码": symbol,
-                        "公司": COMPANY_NAMES.get(symbol, symbol),
-                        "最新返回价格": float(latest["Close"]),
-                        "较上一根 K 线 (%)": change,
-                        "最新 K 线成交量": float(latest["Volume"]) if pd.notna(latest["Volume"]) else np.nan,
-                        "最新 K 线时间（美东）": latest_time.strftime("%Y-%m-%d %H:%M:%S %Z"),
-                        "时间戳差值（分钟）": age,
-                        "状态": status,
+                        "Ticker": symbol,
+                        "Company": COMPANY_NAMES.get(symbol, symbol),
+                        "Last": float(latest["Close"]),
+                        "Bar chg (%)": change,
+                        "Bar volume": float(latest["Volume"]) if pd.notna(latest["Volume"]) else np.nan,
+                        "Bar time (ET)": latest_time.strftime("%Y-%m-%d %H:%M:%S %Z"),
+                        "Age (min)": age,
+                        "Status": status,
                     })
                 except Exception as exc:
                     records.append({
-                        "代码": symbol, "公司": COMPANY_NAMES.get(symbol, symbol), "最新返回价格": np.nan,
-                        "较上一根 K 线 (%)": np.nan, "最新 K 线成交量": np.nan,
-                        "最新 K 线时间（美东）": "请求失败", "时间戳差值（分钟）": np.nan,
-                        "状态": str(exc)[:80],
+                        "Ticker": symbol, "Company": COMPANY_NAMES.get(symbol, symbol),
+                        "Last": np.nan, "Bar chg (%)": np.nan, "Bar volume": np.nan,
+                        "Bar time (ET)": "Request failed", "Age (min)": np.nan, "Status": str(exc)[:80],
                     })
             quote_table = pd.DataFrame(records)
             st.dataframe(
                 quote_table,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
-                    "最新返回价格": st.column_config.NumberColumn(format="$%.2f"),
-                    "较上一根 K 线 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                    "最新 K 线成交量": st.column_config.NumberColumn(format="%.0f"),
-                    "时间戳差值（分钟）": st.column_config.NumberColumn(format="%.1f"),
+                    "Last": st.column_config.NumberColumn(format="$%.2f"),
+                    "Bar chg (%)": st.column_config.NumberColumn(format="%.2f%%"),
+                    "Bar volume": st.column_config.NumberColumn(format="%.0f"),
+                    "Age (min)": st.column_config.NumberColumn(format="%.1f"),
                 },
             )
-        st.caption("重要：时间戳差值只是 K 线时间标签与当前时间之差，不等于数据从交易所到 Yahoo 再到本应用的真实传输延迟。")
+        st.caption("Age is only the gap between the bar timestamp and this clock, not the true exchange-to-screen delay.")
 
     render_live_monitor(live_ticker, live_interval, include_extended, live_watchlist)
 
-else:
-    # Historical-analysis controls
-    st.sidebar.caption("历史行情与风险分析")
-    period = st.sidebar.selectbox("分析时间范围", options=list(PERIOD_LABELS.keys()), index=3, format_func=lambda x: PERIOD_LABELS[x])
-    sector_options = ["全部分类"] + sorted(set(UNIVERSE.values()))
-    selected_sector = st.sidebar.selectbox("股票分类筛选", options=sector_options, index=0)
-    def_tickers = ["NVDA", "AAPL", "MSFT", "SPY"]
-    compare_tickers = st.sidebar.multiselect(
-        "股价走势对比（可多选）",
-        options=list(UNIVERSE.keys()),
-        default=def_tickers,
-        format_func=ticker_label,
-        help="最多建议选择 8 只，图表会更清晰。",
-    )
-    focus_ticker = st.sidebar.selectbox(
-        "个股详情",
-        options=list(UNIVERSE.keys()),
-        format_func=ticker_label,
-        key="detail_ticker",
-    )
-    if st.sidebar.button("🔄 清除缓存并刷新数据", use_container_width=True):
-        download_prices.clear()
-        get_ticker_info.clear()
-        st.rerun()
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**数据说明**")
-    st.sidebar.caption("本区主要使用日线历史数据。数据可能延迟、缺失或受接口限制；本工具不提供投资建议。")
 
-    selected_tickers = tuple(UNIVERSE.keys())
-    with st.spinner("正在从 Yahoo Finance 获取股票日线数据……首次加载可能需要一点时间。"):
-        try:
-            prices = download_prices(selected_tickers, period)
-        except Exception as exc:
-            prices = pd.DataFrame()
-            load_error = str(exc)
-        else:
-            load_error = ""
+def remember_learn_tab() -> None:
+    if st.session_state.get("learn_tab"):
+        st.session_state.learn_tab_persist = st.session_state.learn_tab
 
-    if prices.empty:
-        st.error("没有成功获取行情数据。请检查网络连接、Yahoo Finance 接口状态，或稍后点击左侧“清除缓存并刷新数据”。")
-        if load_error:
-            st.code(load_error)
-        st.info("你可以先确认本机已安装依赖：在 Windows 命令提示符（不是 Python 的 >>>）中运行 `pip install -r requirements.txt`。")
-        st.stop()
 
-    metrics = calculate_metrics(prices)
-    daily_snapshot = calculate_daily_snapshot(prices)
-    if not daily_snapshot.empty:
-        metrics = metrics.merge(
-            daily_snapshot[["代码", "公司", "最近交易日涨跌幅 (%)"]],
-            on="代码",
-            how="left",
-        )
-    if selected_sector != "全部分类":
-        metrics_view = metrics[metrics["类别"] == selected_sector].copy()
-    else:
-        metrics_view = metrics.copy()
-
-    latest_date = prices["date"].max().date()
-    loaded_tickers = prices["ticker"].nunique()
-    positive_share = (metrics["区间涨跌幅 (%)"] > 0).mean() * 100 if not metrics.empty else np.nan
-    median_vol = metrics["年化波动率 (%)"].median() if not metrics.empty else np.nan
-    mean_return = metrics["区间涨跌幅 (%)"].mean() if not metrics.empty else np.nan
-
-    # Prepare filtered prices for visual panels.
-    if selected_sector == "全部分类":
-        active_tickers = list(UNIVERSE.keys())
-    else:
-        active_tickers = [t for t, s in UNIVERSE.items() if s == selected_sector]
-    prices_active = prices[prices["ticker"].isin(active_tickers)].copy()
-    metrics_active = metrics_view.copy()
-
-    if selected_page == "市场首页":
-        st.subheader("主要指数快照")
-        benchmark_tickers = ["SPY", "QQQ", "DIA"]
-        benchmark_labels = {
-            "SPY": "标普 500（SPY）",
-            "QQQ": "纳斯达克 100（QQQ）",
-            "DIA": "道琼斯工业平均（DIA）",
-        }
-        benchmark_cols = st.columns(3)
-        for col, ticker in zip(benchmark_cols, benchmark_tickers):
-            row = metrics[metrics["代码"] == ticker]
-            with col:
-                if row.empty:
-                    st.metric(benchmark_labels[ticker], "暂无数据")
-                else:
-                    r = row.iloc[0]
-                    delta = r.get("最近交易日涨跌幅 (%)", np.nan)
-                    st.metric(
-                        benchmark_labels[ticker],
-                        f"${r['最新收盘价']:,.2f}" if pd.notna(r.get("最新收盘价", np.nan)) else "—",
-                        delta=f"{delta:+.2f}%" if pd.notna(delta) else None,
-                        help=f"最新数据日期：{r.get('最新数据日', '未知')}。显示的是最近可用日线收盘价，不是实时价格。",
-                    )
-
-        stocks_only = metrics[~metrics["代码"].isin(["SPY", "QQQ", "DIA"])].copy()
-        valid_daily_returns = stocks_only["最近交易日涨跌幅 (%)"].dropna()
-        advancers = int((valid_daily_returns > 0).sum())
-        decliners = int((valid_daily_returns < 0).sum())
-        unchanged = int((valid_daily_returns == 0).sum())
-        market_cols = st.columns(4)
-        market_cols[0].metric("观察股票数", f"{len(stocks_only)}")
-        market_cols[1].metric("上涨股票", f"{advancers}")
-        market_cols[2].metric("下跌股票", f"{decliners}")
-        market_cols[3].metric("持平股票", f"{unchanged}")
-        snapshot_dates = pd.to_datetime(stocks_only["最新数据日"], errors="coerce").dropna()
-        snapshot_date = snapshot_dates.max().date() if not snapshot_dates.empty else latest_date
-        st.caption(f"观察列表市场广度 · 最新可用数据日期约为 {snapshot_date}。该统计只覆盖本应用内置股票列表，不代表整个美股市场。")
-
-        st.markdown("### 最近交易日涨跌榜")
-        movers_left, movers_right = st.columns(2, gap="large")
-        with movers_left:
-            gainers = stocks_only.dropna(subset=["最近交易日涨跌幅 (%)"]).nlargest(10, "最近交易日涨跌幅 (%)")
-            if not gainers.empty:
-                fig_gainers = px.bar(
-                    gainers.sort_values("最近交易日涨跌幅 (%)"),
-                    x="最近交易日涨跌幅 (%)", y="代码", orientation="h",
-                    color="最近交易日涨跌幅 (%)", color_continuous_scale="RdYlGn",
-                    hover_data={"公司": True, "最新收盘价": ":.2f", "最新日成交量": ":,.0f"},
-                    title="涨幅榜 · Top 10",
-                )
-                fig_gainers.update_layout(height=390, showlegend=False, xaxis_title="最近交易日涨跌幅 (%)", yaxis_title="", margin=dict(l=5, r=5, t=55, b=5), coloraxis_showscale=False)
-                st.plotly_chart(fig_gainers, use_container_width=True)
-            else:
-                st.info("暂无足够数据生成涨幅榜。")
-        with movers_right:
-            losers = stocks_only.dropna(subset=["最近交易日涨跌幅 (%)"]).nsmallest(10, "最近交易日涨跌幅 (%)")
-            if not losers.empty:
-                fig_losers = px.bar(
-                    losers.sort_values("最近交易日涨跌幅 (%)", ascending=False),
-                    x="最近交易日涨跌幅 (%)", y="代码", orientation="h",
-                    color="最近交易日涨跌幅 (%)", color_continuous_scale="RdYlGn",
-                    hover_data={"公司": True, "最新收盘价": ":.2f", "最新日成交量": ":,.0f"},
-                    title="跌幅榜 · Bottom 10",
-                )
-                fig_losers.update_layout(height=390, showlegend=False, xaxis_title="最近交易日涨跌幅 (%)", yaxis_title="", margin=dict(l=5, r=5, t=55, b=5), coloraxis_showscale=False)
-                st.plotly_chart(fig_losers, use_container_width=True)
-            else:
-                st.info("暂无足够数据生成跌幅榜。")
-
-        st.markdown("### 成交量榜")
-        volume_rank = stocks_only.dropna(subset=["最新日成交量"]).nlargest(10, "最新日成交量")
-        if not volume_rank.empty:
-            fig_volume_rank = px.bar(
-                volume_rank.sort_values("最新日成交量"),
-                x="最新日成交量", y="代码", orientation="h",
-                color="最近交易日涨跌幅 (%)", color_continuous_scale="RdYlGn",
-                hover_data={"公司": True, "最新收盘价": ":.2f", "最近交易日涨跌幅 (%)": ":.2f"},
-                title="最近交易日成交量最高的 10 只股票",
-            )
-            fig_volume_rank.update_layout(height=410, xaxis_title="成交量（股）", yaxis_title="", margin=dict(l=5, r=5, t=55, b=5), coloraxis_showscale=False)
-            st.plotly_chart(fig_volume_rank, use_container_width=True)
-        else:
-            st.info("暂无成交量数据。")
-
-        st.markdown("### 我的自选股")
-        add_col, edit_col = st.columns([1, 3])
-        with add_col:
-            add_ticker = st.selectbox("添加代码", options=list(UNIVERSE.keys()), format_func=ticker_label, key="watchlist_add_ticker")
-            if st.button("＋ 加入自选", use_container_width=True):
-                current_watchlist = list(st.session_state.get("watchlist", []))
-                if add_ticker not in current_watchlist:
-                    st.session_state["watchlist"] = current_watchlist + [add_ticker]
-                    st.success(f"已将 {add_ticker} 加入自选股。")
-                else:
-                    st.info(f"{add_ticker} 已在自选列表中。")
-        with edit_col:
-            st.multiselect(
-                "编辑自选列表（取消选择即可移除）",
-                options=list(UNIVERSE.keys()),
-                format_func=ticker_label,
-                key="watchlist",
-            )
-        watchlist_now = list(st.session_state.get("watchlist", []))
-        watchlist_table = metrics[metrics["代码"].isin(watchlist_now)].copy()
-        if watchlist_table.empty:
-            st.info("自选列表暂时为空。请从左侧添加股票。")
-        else:
-            order_map = {t: i for i, t in enumerate(watchlist_now)}
-            watchlist_table["_顺序"] = watchlist_table["代码"].map(order_map)
-            watchlist_table = watchlist_table.sort_values("_顺序")
-            watchlist_cols = ["代码", "公司", "最新收盘价", "最近交易日涨跌幅 (%)", "区间涨跌幅 (%)", "年化波动率 (%)", "最新日成交量", "最新数据日"]
-            watchlist_table = watchlist_table[watchlist_cols]
-            st.dataframe(
-                watchlist_table,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "最新收盘价": st.column_config.NumberColumn(format="$%.2f"),
-                    "最近交易日涨跌幅 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                    "区间涨跌幅 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                    "年化波动率 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                    "最新日成交量": st.column_config.NumberColumn(format="%.0f"),
-                },
-            )
-            st.download_button("下载自选股数据 CSV", data=watchlist_table.to_csv(index=False).encode("utf-8-sig"), file_name="stockscope_watchlist.csv", mime="text/csv")
-
-    elif selected_page == "市场概览":
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("已加载股票 / ETF", f"{loaded_tickers}", help="来自本应用内置的观察列表，不代表全部美股。")
-        k2.metric(f"观察列表平均涨跌幅 · {PERIOD_LABELS[period]}", pct(mean_return))
-        k3.metric("区间上涨占比", pct(positive_share))
-        k4.metric("股票年化波动率中位数", pct(median_vol))
-        st.caption(f"最后数据日期：{latest_date} · 数据范围：{PERIOD_LABELS[period]} · 当前观察列表共 {len(UNIVERSE)} 个代码")
-        left, right = st.columns([1.15, 0.85], gap="large")
-        with left:
-            fig_heat = make_monthly_sector_heatmap(prices_active)
-            if fig_heat is not None:
-                st.plotly_chart(fig_heat, use_container_width=True)
-            else:
-                st.info("当前时间范围的数据不足以生成月度热力图。")
-        with right:
-            ranked = metrics_active.sort_values("区间涨跌幅 (%)", ascending=False).head(15)
-            fig_rank = px.bar(
-                ranked.sort_values("区间涨跌幅 (%)"),
-                x="区间涨跌幅 (%)", y="代码", color="区间涨跌幅 (%)",
-                color_continuous_scale="RdYlGn", orientation="h",
-                hover_data={"类别": True, "年化波动率 (%)": ":.2f", "最大回撤 (%)": ":.2f"},
-                title="区间表现靠前的 15 个代码",
-            )
-            fig_rank.update_layout(height=420, coloraxis_colorbar_title="涨跌幅 %", margin=dict(l=10, r=10, t=60, b=10), yaxis_title="代码", xaxis_title="区间涨跌幅 (%)")
-            st.plotly_chart(fig_rank, use_container_width=True)
-        st.subheader("观察列表数据表")
-        table_cols = ["代码", "类别", "最新收盘价", "区间涨跌幅 (%)", "年化波动率 (%)", "最大回撤 (%)", "平均日成交量", "最新日成交量", "最新数据日"]
-        display_metrics = metrics_active.sort_values("区间涨跌幅 (%)", ascending=False)[table_cols].copy()
-        st.dataframe(
-            display_metrics,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "最新收盘价": st.column_config.NumberColumn(format="$%.2f"),
-                "区间涨跌幅 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "年化波动率 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "最大回撤 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "平均日成交量": st.column_config.NumberColumn(format="%.0f"),
-                "最新日成交量": st.column_config.NumberColumn(format="%.0f"),
-            },
-        )
-        st.download_button("下载当前筛选结果 CSV", data=display_metrics.to_csv(index=False).encode("utf-8-sig"), file_name="stockscope_screener.csv", mime="text/csv")
-
-    elif selected_page == "股票筛选器":
-        st.subheader("按历史收益与风险缩小观察范围")
-        fc1, fc2, fc3 = st.columns(3)
-        min_return = fc1.slider("最低区间涨跌幅 (%)", min_value=-100, max_value=200, value=-100, step=5)
-        max_vol = fc2.slider("最高年化波动率 (%)", min_value=0, max_value=150, value=150, step=5)
-        sort_by = fc3.selectbox("排序依据", ["区间涨跌幅 (%)", "年化波动率 (%)", "最大回撤 (%)", "平均日成交量"], index=0)
-        filtered = metrics_active[
-            (metrics_active["区间涨跌幅 (%)"].fillna(-999) >= min_return)
-            & (metrics_active["年化波动率 (%)"].fillna(999) <= max_vol)
-        ].copy()
-        ascending = sort_by in ["年化波动率 (%)", "最大回撤 (%)"]
-        filtered = filtered.sort_values(sort_by, ascending=ascending)
-        st.write(f"符合条件的代码：**{len(filtered)}** 个")
-        st.dataframe(
-            filtered,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "最新收盘价": st.column_config.NumberColumn(format="$%.2f"),
-                "区间涨跌幅 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "年化波动率 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "最大回撤 (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "平均日成交量": st.column_config.NumberColumn(format="%.0f"),
-                "最新日成交量": st.column_config.NumberColumn(format="%.0f"),
-            },
-        )
-        st.download_button("下载筛选器结果 CSV", data=filtered.to_csv(index=False).encode("utf-8-sig"), file_name="stockscope_filtered_stocks.csv", mime="text/csv")
-        st.markdown("**指标解释**：区间涨跌幅用时间范围内首个有效收盘价与最新收盘价计算；年化波动率为日收益率标准差乘以 √252；最大回撤为价格相对历史峰值的最大跌幅。")
-
-    elif selected_page == "收益与风险":
-        st.subheader("比较不同股票的收益与波动")
-        if not compare_tickers:
-            st.info("请在左侧选择至少一只股票。")
-        else:
-            compare_data = prices[prices["ticker"].isin(compare_tickers)].copy()
-            if compare_data.empty:
-                st.warning("所选代码暂时没有可用数据。")
-            else:
-                normalized = compare_data.sort_values("date").copy()
-                normalized["基准化价格（起点=100）"] = normalized.groupby("ticker")["close"].transform(lambda s: s / s.dropna().iloc[0] * 100 if not s.dropna().empty else s)
-                fig_line = px.line(normalized, x="date", y="基准化价格（起点=100）", color="ticker", title="基准化股价走势（各股票起点设为 100）", labels={"date": "日期", "ticker": "代码"})
-                fig_line.update_layout(height=470, hovermode="x unified", yaxis_title="基准化价格", xaxis_title="日期", legend_title="代码")
-                st.plotly_chart(fig_line, use_container_width=True)
-            scat = metrics[metrics["代码"].isin(compare_tickers)].copy()
-            if not scat.empty:
-                fig_scatter = px.scatter(
-                    scat, x="年化波动率 (%)", y="区间涨跌幅 (%)", color="类别", text="代码",
-                    hover_data={"最新收盘价": ":.2f", "最大回撤 (%)": ":.2f", "平均日成交量": ":,.0f"},
-                    title="收益—风险散点图",
-                )
-                fig_scatter.update_traces(textposition="top center", marker={"size": 12, "opacity": 0.8})
-                fig_scatter.update_layout(height=450, xaxis_title="年化波动率 (%)", yaxis_title="区间涨跌幅 (%)", legend_title="分类")
-                st.plotly_chart(fig_scatter, use_container_width=True)
-            st.caption("历史收益与波动只用于描述过去，不是对未来表现的预测。")
-
-    elif selected_page == "个股详情":
-        st.subheader(f"{focus_ticker}｜{COMPANY_NAMES.get(focus_ticker, focus_ticker)} · {UNIVERSE.get(focus_ticker, '其他')} 个股详情")
-        one = prices[prices["ticker"] == focus_ticker].sort_values("date").copy()
-        one_metric = metrics[metrics["代码"] == focus_ticker]
-        if one.empty:
-            st.warning("该代码当前没有返回数据。")
-        else:
-            m = one_metric.iloc[0] if not one_metric.empty else {}
-            a, b, c, dcol = st.columns(4)
-            a.metric("最新收盘价", f"${m.get('最新收盘价', np.nan):,.2f}" if pd.notna(m.get("最新收盘价", np.nan)) else "—")
-            b.metric("区间涨跌幅", pct(m.get("区间涨跌幅 (%)", np.nan)))
-            c.metric("年化波动率", pct(m.get("年化波动率 (%)", np.nan)))
-            dcol.metric("最大回撤", pct(m.get("最大回撤 (%)", np.nan)))
-            price_fig = go.Figure()
-            price_fig.add_trace(go.Scatter(x=one["date"], y=one["close"], mode="lines", name="调整后收盘价", line={"width": 2}))
-            price_fig.update_layout(title=f"{focus_ticker} 历史收盘价", height=360, xaxis_title="日期", yaxis_title="价格（美元）", hovermode="x unified")
-            st.plotly_chart(price_fig, use_container_width=True)
-            vol_fig = px.bar(one, x="date", y="volume", title=f"{focus_ticker} 每日成交量", labels={"date": "日期", "volume": "成交量（股）"})
-            vol_fig.update_layout(height=320, xaxis_title="日期", yaxis_title="成交量（股）")
-            st.plotly_chart(vol_fig, use_container_width=True)
-
-            with st.expander("可选：查看 Yahoo Finance 基本面字段（可能缺失）", expanded=False):
-                with st.spinner("正在读取个股基本面字段……"):
-                    info = get_ticker_info(focus_ticker)
-                fundamental_fields = [
-                    ("marketCap", "市值", money),
-                    ("trailingPE", "市盈率（TTM）", lambda x: f"{x:.2f} 倍" if pd.notna(x) else "—"),
-                    ("forwardPE", "预期市盈率", lambda x: f"{x:.2f} 倍" if pd.notna(x) else "—"),
-                    ("priceToBook", "市净率", lambda x: f"{x:.2f} 倍" if pd.notna(x) else "—"),
-                    ("revenueGrowth", "营收同比增长", lambda x: pct(x * 100) if pd.notna(x) else "—"),
-                    ("profitMargins", "净利润率", lambda x: pct(x * 100) if pd.notna(x) else "—"),
-                    ("returnOnEquity", "净资产收益率", lambda x: pct(x * 100) if pd.notna(x) else "—"),
-                    ("totalRevenue", "总营收", money),
-                    ("freeCashflow", "自由现金流", money),
-                    ("fiftyTwoWeekHigh", "52 周最高价", lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
-                    ("fiftyTwoWeekLow", "52 周最低价", lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
-                ]
-                if not info:
-                    st.warning("Yahoo Finance 当前没有返回基本面数据。价格与成交量功能不受此项影响。")
-                else:
-                    fundamental_rows = []
-                    for key, label, formatter in fundamental_fields:
-                        value = info.get(key)
-                        try:
-                            val_num = float(value) if value is not None else np.nan
-                            shown = formatter(val_num)
-                        except (ValueError, TypeError):
-                            shown = "—"
-                        fundamental_rows.append({"指标": label, "数值": shown})
-                    st.dataframe(pd.DataFrame(fundamental_rows), use_container_width=True, hide_index=True)
-                    st.caption("基本面字段由 Yahoo Finance 返回，定义、更新时点和可用性可能因公司而异；正式研究时应回到公司申报文件核对。")
-
-    elif selected_page == "方法与数据":
-        st.subheader("数据来源与计算口径")
+def render_learn() -> None:
+    apply_pending_learn_tab()
+    bind_widget("learn_tab", "learn_tab_persist", "Start here")
+    st.segmented_control("Learn", options=LEARN_TABS, key="learn_tab", on_change=remember_learn_tab)
+    if st.session_state.learn_tab == "Start here":
+        st.markdown("## Learn the market, then look it up here")
         st.markdown(
-            """
-            **数据来源**
-            - 实时看盘：尝试获取 1m、5m、15m、30m 或 60m 分钟 K 线，展示蜡烛图、每根 K 线成交量、最新返回价格、时间戳状态及自选股分钟表。
-            - 历史首页：全局股票搜索、指数快照、最近交易日涨跌榜、成交量榜和可编辑的会话自选股。
-            - 历史行情：通过 Python 包 `yfinance` 读取 Yahoo Finance 历史日线数据。
-            - 默认观察列表：本应用内置约 50 个美国股票与市场 ETF 代码，按便于课堂分析的类别整理，不是完整的美股名录，也不是官方行业分类。
-            - 价格：使用 `auto_adjust=True`，因此下载字段 `Close` 为调整后收盘价；不同版本返回的数据字段可能不同。
-            - 成交量：使用 Yahoo Finance 返回的 `Volume` 字段。对拆股、数据缺失或异常零值应额外检查。
-
-            **计算口径**
-            - 区间涨跌幅 =（区间最新收盘价 ÷ 区间首个有效收盘价 − 1）× 100。
-            - 年化波动率 = 区间内日收益率标准差 × √252 × 100；短时间区间的估计可能不稳定。
-            - 最大回撤 = 收盘价相对截至当日历史最高收盘价的最大跌幅。
-            - 行业月度热力图 = 分类内股票月度收益率的简单平均；不是市值加权行业收益率。
-
-            **重要限制**
-            - 自选股保存在当前应用会话中；新会话或重启应用后可能重置。
-            - 这是学习与分析原型，不是交易系统，也不构成投资建议。
-            - Yahoo 数据可能延迟、缺失、修订或受请求限制。分钟 K 线和自动刷新不构成实时数据保证；时间戳差值不能单独证明真实传输延迟。自动刷新会增加请求频率，若出现限流可改为每 60 秒或手动刷新。
-            - 使用 `yfinance` 不等于获得 Yahoo 行情的公开再分发授权。公开部署前应核对 Yahoo Finance 的适用条款，并确认课程对“开放数据/API”的要求。
-            - 为满足课程研究规范，建议记录抓取日期、清洗步骤、变量定义、缺失值处理，并保存清洗后的数据集与代码版本。
-            """
+            "StockScope Learn is a **separate beginner course**. This dashboard does not embed those lessons, "
+            "so each app stays focused. Use Learn to build vocabulary; use Home and Markets to look at real quotes."
         )
-        st.subheader("当前加载数据概况")
+        col1, col2 = st.columns(2, gap="large")
+        with col1:
+            st.markdown("### Open the Learn app")
+            st.caption("From the repository root. Keep this dashboard on port 8501 so both can run.")
+            st.code("cd learn\npython3 -m streamlit run app.py --server.port 8502", language="bash")
+            st.markdown("Then open **http://localhost:8502**.")
+        with col2:
+            st.markdown(
+                """
+                <div class="learn-card">
+                  <h3>Course map</h3>
+                  <ol>
+                    <li>Stock market basics</li>
+                    <li>Reading a quote · candlesticks · indicators</li>
+                    <li>How a trade is executed</li>
+                    <li>Researching a company</li>
+                    <li>Why prices move</li>
+                    <li>Risk and investor protection</li>
+                  </ol>
+                  <p>Plus a practice quiz and a data-and-methods page inside Learn.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.info("Tip: after a lesson on indices, come back to Home and compare SPX, NDX, and DJI on the same day.")
+        return
+
+    render_methods()
+
+
+def render_methods() -> None:
+    st.subheader("Data sources and definitions")
+    st.markdown(
+        """
+        **Where the numbers come from**
+        - Home quotes and charts: Yahoo Finance through the Python package `yfinance`.
+        - Main indices use Yahoo symbols `^GSPC` (shown as SPX), `^NDX` (NDX), and `^DJI` (DJI).
+        - Live quotes: 1m / 5m / 15m / 30m / 60m bars with a candle chart, volume, and a short watch table.
+        - Markets overview: daily history for a starter list of about 50 US stocks and benchmark ETFs.
+        - Prices on historical pages use `auto_adjust=True`, so `Close` is the adjusted close.
+
+        **How we compute**
+        - Period return = (last close ÷ first valid close − 1) × 100.
+        - Annualized volatility = daily-return standard deviation × √252 × 100.
+        - Max drawdown = worst drop from a running peak close.
+        - Group heatmap = simple average of monthly stock returns inside each classroom group, not a cap-weighted sector index.
+
+        **Limits**
+        - The watchlist lives in this browser session and resets when the app restarts.
+        - This is a learning prototype, not a trading system, and not investment advice.
+        - Yahoo data can be delayed, missing, revised, or rate-limited. A close timestamp is not a latency SLA.
+        - Using `yfinance` is not a redistribution license. Check Yahoo's terms before any public deployment.
+        """
+    )
+    if st.button("Load a 1-year snapshot of the starter list"):
+        prices, metrics, error = load_universe("1y")
+        if prices.empty:
+            st.error("Could not load that snapshot.")
+            if error:
+                st.code(error)
+            return
+        st.subheader("Current load")
         data_summary = pd.DataFrame([
-            {"项目": "数据行数", "值": f"{len(prices):,}"},
-            {"项目": "不同代码数", "值": str(prices["ticker"].nunique())},
-            {"项目": "起始日期", "值": str(prices["date"].min().date())},
-            {"项目": "最后日期", "值": str(prices["date"].max().date())},
-            {"项目": "缺失成交量比例", "值": f"{prices['volume'].isna().mean() * 100:.2f}%"},
+            {"Item": "Rows", "Value": f"{len(prices):,}"},
+            {"Item": "Symbols", "Value": str(prices["ticker"].nunique())},
+            {"Item": "First date", "Value": str(prices["date"].min().date())},
+            {"Item": "Last date", "Value": str(prices["date"].max().date())},
+            {"Item": "Missing volume share", "Value": f"{prices['volume'].isna().mean() * 100:.2f}%"},
         ])
-        st.dataframe(data_summary, use_container_width=True, hide_index=True)
-        st.download_button("下载已清洗日线数据 CSV", data=prices.to_csv(index=False).encode("utf-8-sig"), file_name="stockscope_daily_prices.csv", mime="text/csv")
-st.markdown("---")
-st.markdown("<div class='small-note'>StockScope · 课堂项目原型 · 请独立核实数据定义与使用权限；本工具不构成投资建议。</div>", unsafe_allow_html=True)
+        st.dataframe(data_summary, width="stretch", hide_index=True)
+        st.download_button(
+            "Download cleaned daily CSV",
+            data=prices.to_csv(index=False).encode("utf-8-sig"),
+            file_name="stockscope_daily_prices.csv",
+            mime="text/csv",
+        )
+        if not metrics.empty:
+            st.caption(f"{len(metrics)} symbols in the metrics table.")
+
+
+def render_watchlist_page() -> None:
+    st.subheader("Your watchlist")
+    st.caption("Indices stay pinned so beginners always see the three main US benchmarks. Stocks you add sit underneath.")
+    needed = tuple(dict.fromkeys([*INDEX_ORDER, *st.session_state.get("watchlist", [])]))
+    with st.spinner("Updating watchlist quotes…"):
+        try:
+            prices = download_prices(needed, "5d")
+        except Exception:
+            prices = pd.DataFrame()
+    snap = snapshot_from_prices(prices)
+    left, right = st.columns([1.15, 1.55], gap="large")
+    with left:
+        render_watchlist_panel(snap, show_remove=True)
+        if st.button("Open live quotes for this list"):
+            go_to("Markets", markets_tab="Live quotes")
+            st.rerun()
+    with right:
+        render_selected_chart(st.session_state.selected_symbol, snap)
+
+
+def main() -> None:
+    init_state()
+    apply_pending_widgets()
+    st.markdown(APP_STYLE, unsafe_allow_html=True)
+    render_top_nav()
+
+    nav = st.session_state.nav
+    if nav == "Home":
+        render_home()
+    elif nav == "Index":
+        render_index_page()
+    elif nav == "Learn":
+        render_learn()
+    elif nav == "Markets":
+        render_markets()
+    elif nav == "Watchlist":
+        render_watchlist_page()
+    else:
+        render_home()
+
+    st.markdown("---")
+    st.markdown(
+        "<div class='small-note'>StockScope · classroom prototype · verify definitions and data rights yourself. "
+        "This tool is not investment advice.</div>",
+        unsafe_allow_html=True,
+    )
+
+
+main()
