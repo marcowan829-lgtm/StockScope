@@ -11,6 +11,9 @@ import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 from plotly.subplots import make_subplots
+from chart_help import chart_help_button, help_chart
+from learning_integration import render_learning_page, render_study_launcher
+from watchlist_design import WATCHLIST_STYLE, quote_labels, watchlist_row_html
 
 
 st.set_page_config(
@@ -20,8 +23,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-TOP_NAV = ["Home", "Learn", "Markets", "Watchlist"]
-MARKET_TABS = ["Overview", "Screener", "Live quotes", "Returns & risk", "Stock"]
+TOP_NAV = ["Home", "Market Overview", "Screener", "Live Quotes", "Returns & Risk", "Stock Research"]
+LEGACY_MARKET_NAV = {
+    "Overview": "Market Overview", "Screener": "Screener", "Live quotes": "Live Quotes",
+    "Returns & risk": "Returns & Risk", "Stock": "Stock Research",
+}
 LEARN_TABS = ["Start here", "Data & methods"]
 UP_COLOR = "#089981"
 DOWN_COLOR = "#f23645"
@@ -252,7 +258,8 @@ APP_STYLE = """
   }
   .learn-card h3 { margin: 0 0 0.4rem 0; font-size: 1.02rem; }
   .learn-card p, .learn-card li { color: #4c4f59; font-size: 0.92rem; }
-  div.st-key-nav_pills [data-testid="stMarkdownContainer"] p { font-weight: 600; }
+  div.st-key-nav_pills [data-testid="stMarkdownContainer"] p { font-weight: 600; font-size: 0.84rem; }
+  div.st-key-nav_pills button { white-space: nowrap; padding: 0.4rem 0.65rem; min-height: 2.5rem; }
   div.st-key-nav_search [data-testid="stTextInputRootElement"] {
     border-radius: 24px;
     background: #f0f3fa;
@@ -260,6 +267,15 @@ APP_STYLE = """
   }
   div.st-key-nav_search input { background: transparent; }
   .nav-rule { border: 0; border-top: 1px solid #e0e3eb; margin: 0.1rem 0 0.85rem 0; }
+  .chart-help-title { font-size: 1rem; font-weight: 700; line-height: 1.45; margin: 0; color: #131722; }
+  div[class*="st-key-chart_help_"] button {
+    border-radius: 50% !important; width: 2.2rem !important; height: 2.2rem !important;
+    min-height: 2.2rem !important; padding: 0 !important;
+    color: #4c4f59 !important; background: #fff !important;
+    border: 1px solid #b2b5be !important; font-weight: 700 !important;
+  }
+  div[class*="st-key-chart_help_"] button:hover { color: #131722 !important; border-color: #131722 !important; background: #f0f3fa !important; }
+  div[class*="st-key-chart_help_"] button:focus-visible { outline: 2px solid #2962ff; outline-offset: 3px; }
   div[class*="st-key-idx_add_"] button,
   div[class*="st-key-idx_open_"] button {
     min-width: 2.15rem !important;
@@ -397,6 +413,7 @@ def download_prices(tickers: tuple[str, ...], period: str) -> pd.DataFrame:
     )
     if raw is None or raw.empty:
         return pd.DataFrame(columns=["date", "ticker", "close", "volume"])
+    raw = raw.loc[~raw.index.duplicated(keep="last")]
 
     def extract_field(frame: pd.DataFrame, field: str) -> pd.DataFrame:
         if isinstance(frame.columns, pd.MultiIndex):
@@ -483,7 +500,7 @@ def download_ohlc(ticker: str, period: str, interval: str) -> pd.DataFrame:
                 return pd.DataFrame()
         if data is None or data.empty:
             return pd.DataFrame()
-        last_day = pd.Timestamp(data.index[-1]).date()
+        last_day = pd.Timestamp(data.index.max()).date()
         data = data[pd.Series(data.index.date, index=data.index) == last_day]
     data = data.copy()
     for column in ["Open", "High", "Low", "Close", "Volume"]:
@@ -491,7 +508,8 @@ def download_ohlc(ticker: str, period: str, interval: str) -> pd.DataFrame:
             data[column] = pd.to_numeric(data[column], errors="coerce")
     if "Close" not in data.columns:
         return pd.DataFrame()
-    return data.dropna(subset=["Close"]).sort_index()
+    data = data.dropna(subset=["Close"]).sort_index()
+    return data.loc[~data.index.duplicated(keep="last")]
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -561,7 +579,7 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
     temp["month"] = pd.to_datetime(temp["date"]).dt.to_period("M").dt.to_timestamp()
     month_ends = temp.sort_values("date").groupby(["ticker", "month"], as_index=False).tail(1)
     pivot = month_ends.pivot(index="ticker", columns="month", values="close").sort_index(axis=1)
-    monthly_returns = pivot.pct_change(axis=1) * 100
+    monthly_returns = pivot.pct_change(axis=1, fill_method=None) * 100
     if monthly_returns.empty:
         return None
     monthly_returns = monthly_returns.iloc[:, 1:]
@@ -607,23 +625,25 @@ def to_et_naive(index: pd.Index) -> pd.DatetimeIndex:
     return idx
 
 
-def clip_regular_session(frame: pd.DataFrame, range_key: str) -> pd.DataFrame:
-    """Keep regular US-session bars so Plotly never plots overnight or weekend prints."""
+def clip_regular_session(frame: pd.DataFrame, range_key: str, *, include_extended: bool = False) -> pd.DataFrame:
+    """Keep the requested regular or extended US session, excluding weekends."""
     out = frame.copy()
     out.index = to_et_naive(out.index)
     weekday = out.index.day_of_week < 5
     if range_key in INTRADAY_RANGES:
         minutes = out.index.hour * 60 + out.index.minute
-        session = (minutes >= SESSION_OPEN_MIN) & (minutes <= SESSION_CLOSE_MIN)
+        open_min, close_min = (4 * 60, 20 * 60) if include_extended else (SESSION_OPEN_MIN, SESSION_CLOSE_MIN)
+        session = (minutes >= open_min) & (minutes <= close_min)
         return out.loc[weekday & session]
     return out.loc[weekday]
 
 
-def market_rangebreaks(index: pd.DatetimeIndex, range_key: str) -> list[dict]:
+def market_rangebreaks(index: pd.DatetimeIndex, range_key: str, *, include_extended: bool = False) -> list[dict]:
     """Collapse weekends, US overnight hours, and weekday holidays on the time axis."""
     breaks: list[dict] = [dict(bounds=["sat", "mon"])]
     if range_key in INTRADAY_RANGES:
-        breaks.append(dict(bounds=[SESSION_CLOSE_HOUR, SESSION_OPEN_HOUR], pattern="hour"))
+        close_hour, open_hour = (20, 4) if include_extended else (SESSION_CLOSE_HOUR, SESSION_OPEN_HOUR)
+        breaks.append(dict(bounds=[close_hour, open_hour], pattern="hour"))
     if len(index) >= 2:
         idx = pd.DatetimeIndex(index)
         start, end = idx.min().normalize(), idx.max().normalize()
@@ -653,16 +673,10 @@ def _split_at_baseline(index, values, level: float):
                 y_hi.append(level)
                 x_lo.append(x_cross)
                 y_lo.append(level)
-        if y >= level:
-            x_hi.append(x)
-            y_hi.append(y)
-            x_lo.append(None)
-            y_lo.append(None)
-        else:
-            x_lo.append(x)
-            y_lo.append(y)
-            x_hi.append(None)
-            y_hi.append(None)
+        x_hi.append(x if y >= level else None)
+        y_hi.append(y if y >= level else None)
+        x_lo.append(x if y <= level else None)
+        y_lo.append(y if y <= level else None)
     return x_hi, y_hi, x_lo, y_lo
 
 
@@ -730,13 +744,14 @@ def build_price_chart(
     *,
     previous_close: float | None = None,
     range_key: str = "1D",
+    include_extended: bool = False,
 ) -> go.Figure:
-    """Quote-site price pane: Line / Candle / Area / Baseline, regular hours only."""
+    """Quote-site price pane, using regular US hours unless extended hours are requested."""
     empty_ticks = "%I:%M %p" if range_key == "1D" else "%b %d"
     if frame.empty:
         return apply_market_layout(go.Figure(), height=460, tickformat=empty_ticks)
 
-    frame = clip_regular_session(frame, range_key)
+    frame = clip_regular_session(frame, range_key, include_extended=include_extended)
     if frame.empty:
         return apply_market_layout(go.Figure(), height=460, tickformat=empty_ticks)
 
@@ -850,6 +865,11 @@ def build_price_chart(
 
     ymin = float(close.min())
     ymax = float(close.max())
+    if kind == "Candle":
+        if frame["Low"].notna().any():
+            ymin = min(ymin, float(frame["Low"].min()))
+        if frame["High"].notna().any():
+            ymax = max(ymax, float(frame["High"].max()))
     if kind == "Baseline":
         ymin = min(ymin, float(ref))
         ymax = max(ymax, float(ref))
@@ -866,7 +886,7 @@ def build_price_chart(
         fig,
         height=500,
         tickformat=tickformat,
-        rangebreaks=market_rangebreaks(pd.DatetimeIndex(x), range_key),
+        rangebreaks=market_rangebreaks(pd.DatetimeIndex(x), range_key, include_extended=include_extended),
     )
     fig.update_yaxes(range=[ymin - pad, ymax + pad], tickformat=",.2f", title_text="", row=1, col=1)
     if has_volume:
@@ -926,9 +946,9 @@ def _take_pending(pending_key: str):
 
 
 def apply_pending_nav_pills() -> None:
-    value = _take_pending("_pending_nav_pills")
-    if value is None:
+    if "_pending_nav_pills" not in st.session_state:
         return
+    value = st.session_state.pop("_pending_nav_pills")
     st.session_state.nav_pills = value
     st.session_state._last_nav_pill = value
 
@@ -977,6 +997,7 @@ def open_index_page(ticker: str) -> None:
     st.session_state.nav = "Index"
     st.session_state.index_full_chart = False
     st.session_state._pending_idx_switcher = ticker
+    st.session_state._pending_nav_pills = None
 
 
 def on_idx_switch() -> None:
@@ -1073,8 +1094,7 @@ def on_search_change() -> None:
         if ticker in INDEX_META:
             open_index_page(ticker)
         else:
-            st.session_state.nav = "Home"
-            st.session_state.index_full_chart = False
+            go_to("Home")
 
 
 def bind_widget(key: str, persist_key: str, default) -> None:
@@ -1107,6 +1127,15 @@ def remember_idx_chart_type() -> None:
 
 def init_state() -> None:
     st.session_state.setdefault("nav", "Home")
+    # Migrate open sessions from the old nested Markets navigation.
+    previous_nav = st.session_state.nav
+    if previous_nav == "Markets":
+        previous_tab = st.session_state.get("_pending_markets_tab") or st.session_state.get("markets_tab") or st.session_state.get("markets_tab_persist", "Overview")
+        st.session_state.nav = LEGACY_MARKET_NAV.get(previous_tab, "Market Overview")
+        st.session_state._pending_nav_pills = st.session_state.nav
+    elif previous_nav not in [*TOP_NAV, "Index", "Lesson"]:
+        st.session_state.nav = "Home"
+        st.session_state._pending_nav_pills = "Home"
     st.session_state.setdefault("markets_tab_persist", "Overview")
     st.session_state.setdefault("learn_tab_persist", "Start here")
     st.session_state.setdefault("selected_symbol", "AAPL")
@@ -1132,26 +1161,24 @@ def init_state() -> None:
 
 
 def render_top_nav() -> None:
-    left, right = st.columns([3.6, 1.55], gap="large")
-    with left:
-        brand, pills = st.columns([1.15, 3.4])
-        with brand:
-            st.markdown('<div class="topnav"><div class="brand">StockScope</div></div>', unsafe_allow_html=True)
-        with pills:
-            if "nav_pills" not in st.session_state:
-                st.session_state.nav_pills = st.session_state.nav if st.session_state.nav in TOP_NAV else "Home"
-            picked = st.pills("Section", TOP_NAV, key="nav_pills", label_visibility="collapsed")
-            last_pill = st.session_state.get("_last_nav_pill")
-            if picked and picked != last_pill:
-                st.session_state.nav = picked
-                st.session_state.index_full_chart = False
-                st.session_state._last_nav_pill = picked
-            elif picked and st.session_state.get("nav") in TOP_NAV:
-                st.session_state._last_nav_pill = picked
-    with right:
+    brand, navigation, search = st.columns([1.05, 5.85, 1.8], gap="medium", vertical_alignment="center")
+    with brand:
+        st.markdown('<div class="topnav"><div class="brand">StockScope</div></div>', unsafe_allow_html=True)
+    with navigation:
+        if "nav_pills" not in st.session_state:
+            st.session_state.nav_pills = st.session_state.nav if st.session_state.nav in TOP_NAV else None
+        picked = st.pills("Section", TOP_NAV, key="nav_pills", label_visibility="collapsed")
+        last_pill = st.session_state.get("_last_nav_pill")
+        if picked and picked != last_pill:
+            st.session_state.nav = picked
+            st.session_state.index_full_chart = False
+            st.session_state._last_nav_pill = picked
+        elif picked and st.session_state.get("nav") in TOP_NAV:
+            st.session_state._last_nav_pill = picked
+    with search:
         st.text_input(
             "Search",
-            placeholder="Search",
+            placeholder="Search stocks or indices",
             label_visibility="collapsed",
             key="nav_search",
             on_change=on_search_change,
@@ -1176,8 +1203,7 @@ def render_top_nav() -> None:
             if chosen in INDEX_META:
                 open_index_page(chosen)
             else:
-                st.session_state.nav = "Home"
-                st.session_state.index_full_chart = False
+                go_to("Home")
             st.rerun()
     if st.session_state.get("flash"):
         st.caption(st.session_state.flash)
@@ -1260,66 +1286,71 @@ def style_watchlist(df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
-def handle_watchlist_selection(event, table: pd.DataFrame) -> None:
-    rows = event.selection.rows if event and getattr(event, "selection", None) else []
-    if not rows or table.empty:
+def on_watchlist_selection(key: str, tickers: list[str]) -> None:
+    """Update before rendering, only when the table selection actually changes."""
+    event = st.session_state.get(key, {})
+    rows = event.get("selection", {}).get("rows", [])
+    if not rows:
         return
     idx = rows[0]
-    if 0 <= idx < len(table):
-        st.session_state.selected_symbol = str(table.iloc[idx]["ticker"])
+    if 0 <= idx < len(tickers):
+        st.session_state["selected_symbol"] = tickers[idx]
+
+
+def select_watchlist_symbol(ticker: str) -> None:
+    st.session_state.selected_symbol = ticker
+
+
+def render_watchlist_rows(tickers: Iterable[str], snap: pd.DataFrame) -> None:
+    for ticker in tickers:
+        quote = lookup_snapshot(snap, ticker)
+        meta = INDEX_META.get(ticker, {})
+        selected = ticker == st.session_state.selected_symbol
+        last, change, _ = quote_labels(quote.get("last"), quote.get("chg"), quote.get("chg_pct"), is_index=bool(meta))
+        label = f"Show {company_name(ticker)} ({display_symbol(ticker)}) on chart. Price {last}; daily change {change}."
+        if selected:
+            label += " Selected."
+        with st.container(key=widget_key("wlrow", ticker)):
+            st.markdown(watchlist_row_html(
+                ticker, company_name(ticker), display_symbol(ticker),
+                quote.get("last"), quote.get("chg"), quote.get("chg_pct"),
+                selected=selected, index_badge=meta.get("badge"), index_color=meta.get("badge_bg", "#2962ff"),
+            ), unsafe_allow_html=True)
+            st.button(label, key=widget_key("wl_pick", ticker), width="stretch",
+                      on_click=select_watchlist_symbol, args=(ticker,),
+                      help="Currently shown on the chart" if selected else f"Show {display_symbol(ticker)} on the chart")
 
 
 def render_watchlist_panel(snap: pd.DataFrame, *, show_remove: bool = False) -> None:
-    head_l, head_r = st.columns([3, 1])
-    with head_l:
-        st.markdown('<p class="wl-title">Watchlist</p>', unsafe_allow_html=True)
-    with head_r:
-        with st.popover("＋"):
-            add_query = st.text_input("Add ticker", placeholder="MCD", key="wl_add_query")
-            if st.button("Add symbol", key="wl_add_btn", width="stretch"):
-                resolved = resolve_search(add_query)
-                if resolved.get("ticker"):
-                    st.session_state.flash = add_to_watchlist(resolved["ticker"])
-                    st.rerun()
-                else:
-                    st.session_state.flash = resolved.get("error", "Could not add that symbol.")
-                    st.rerun()
+    stocks = [ticker for ticker in st.session_state.get("watchlist", []) if ticker not in INDEX_META]
+    st.markdown(WATCHLIST_STYLE, unsafe_allow_html=True)
+    with st.container(key="watchlist_panel"):
+        with st.container(key="watchlist_header"):
+            head_l, head_r = st.columns([3, 1], vertical_alignment="center")
+            with head_l:
+                st.markdown(f'<p class="watchlist-heading">Watchlist</p><p class="watchlist-summary">{len(INDEX_ORDER)} indices · {len(stocks)} stocks & funds</p>', unsafe_allow_html=True)
+            with head_r:
+                with st.popover("＋", help="Add a company or fund to your watchlist"):
+                    add_query = st.text_input("Add ticker", placeholder="Name or ticker, e.g. NVDA", key="wl_add_query")
+                    if st.button("Add symbol", key="wl_add_btn", width="stretch"):
+                        resolved = resolve_search(add_query)
+                        st.session_state.flash = add_to_watchlist(resolved["ticker"]) if resolved.get("ticker") else resolved.get("error", "Could not add that symbol.")
+                        st.rerun()
 
-    st.markdown('<div class="section-label">Indices</div>', unsafe_allow_html=True)
-    idx_table = watchlist_frame(INDEX_ORDER, snap)
-    idx_event = st.dataframe(
-        style_watchlist(idx_table),
-        width="stretch",
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="wl_indices",
-        height=52 + 36 * len(INDEX_ORDER),
-    )
-    handle_watchlist_selection(idx_event, idx_table)
-
-    st.markdown('<div class="section-label">Stocks</div>', unsafe_allow_html=True)
-    stocks = [t for t in st.session_state.get("watchlist", []) if t not in INDEX_META]
-    if not stocks:
-        st.caption("No stocks yet. Use ＋ to add a beginner-friendly name such as AAPL.")
-    else:
-        stock_table = watchlist_frame(stocks, snap)
-        stock_event = st.dataframe(
-            style_watchlist(stock_table),
-            width="stretch",
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="wl_stocks",
-            height=52 + 36 * max(len(stocks), 1),
-        )
-        handle_watchlist_selection(stock_event, stock_table)
-        if show_remove:
-            drop = st.selectbox("Remove", options=["—"] + stocks, format_func=lambda t: ticker_label(t) if t != "—" else "—")
-            if drop != "—" and st.button("Remove from watchlist"):
-                remove_from_watchlist(drop)
-                st.rerun()
-    st.caption("Click a row to show it on the chart. Quotes via Yahoo Finance; they may be delayed.")
+        st.markdown(f'<div class="watchlist-group-title">Market indices<span class="watchlist-count">{len(INDEX_ORDER)}</span></div>', unsafe_allow_html=True)
+        render_watchlist_rows(INDEX_ORDER, snap)
+        st.markdown(f'<div class="watchlist-group-title">Stocks & funds<span class="watchlist-count">{len(stocks)}</span></div>', unsafe_allow_html=True)
+        if stocks:
+            render_watchlist_rows(stocks, snap)
+            if show_remove:
+                with st.popover("Manage watchlist", width="stretch"):
+                    drop = st.selectbox("Remove", options=["—"] + stocks, format_func=lambda ticker: ticker_label(ticker) if ticker != "—" else "—", key="wl_remove_choice")
+                    if st.button("Remove from watchlist", key="wl_remove_btn", width="stretch", disabled=drop == "—"):
+                        remove_from_watchlist(drop)
+                        st.rerun()
+        else:
+            st.caption("Your list starts here. Use ＋ to add a company or fund.")
+        st.caption("Select a row to update the chart. Yahoo Finance quotes may be delayed.")
 
 
 def _index_chart_figure(ticker: str, snap: pd.DataFrame, *, tall: bool = False) -> tuple[go.Figure | None, pd.DataFrame]:
@@ -1355,7 +1386,7 @@ def _index_chart_figure(ticker: str, snap: pd.DataFrame, *, tall: bool = False) 
     fig = build_price_chart(series, ticker, chart_type, previous_close=prev_close, range_key=range_key)
     if tall:
         fig.update_layout(height=720)
-    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False, "scrollZoom": True})
+    help_chart(fig, f"price_{chart_type.lower()}", "index_price", width="stretch", config={"displayModeBar": False, "scrollZoom": True})
     return fig, series
 
 
@@ -1533,7 +1564,9 @@ def render_index_page() -> None:
                 fig_cmp.update_xaxes(showgrid=False)
                 fig_cmp.update_yaxes(gridcolor=GRID_COLOR, zeroline=False)
                 restyle_chart(fig_cmp, height=260)
-                st.plotly_chart(fig_cmp, width="stretch", config={"displayModeBar": False})
+                fig_cmp.update_layout(showlegend=True)
+                fig_cmp.add_hline(y=100, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
+                help_chart(fig_cmp, "comparison", "index_comparison", width="stretch", config={"displayModeBar": False})
                 st.caption("Each line starts at 100 one year ago, so you can compare path, not the raw index level.")
 
         st.markdown("##### Names inside this index")
@@ -1573,11 +1606,11 @@ def render_home() -> None:
     snap = snapshot_from_prices(prices)
     render_index_cards(snap)
 
-    chart_col, list_col = st.columns([2.35, 1], gap="large")
+    chart_col, list_col = st.columns([2.2, 1.15], gap="large")
     with chart_col:
         render_selected_chart(selected, snap)
     with list_col:
-        render_watchlist_panel(snap, show_remove=False)
+        render_watchlist_panel(snap, show_remove=True)
 
 
 def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
@@ -1597,21 +1630,8 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
             on_change=remember_chart_type,
         )
     with help_col:
-        with st.popover("Help"):
-            st.markdown(
-                """
-                **How to read this chart** (Microsoft Edge / MSN Money style)
-                - **Line** — last price only, no fill.
-                - **Candle** — open / high / low / close for each bar.
-                - **Area** — line with a fill down to the bottom of the pane (green if up vs previous close).
-                - **Baseline** — green above the baseline, red below. Baseline is the previous close when known, otherwise the first price in this range.
-                - **Nights, weekends, and US holidays are hidden**, so the line stays continuous instead of stretching across closed hours.
-                - Thin **green / red volume** sits at the bottom of the same pane.
-                - The **price scale is zoomed to this range**, not to zero — a small move can look tall.
-                - Header change is versus the **previous close**, not versus the left edge of the chart.
-                - Figures come from Yahoo Finance and may be delayed. This is not a trading terminal.
-                """
-            )
+        chart_type = st.session_state.get("chart_type") or "Line"
+        chart_help_button(f"price_{chart_type.lower()}", "home")
     with add_col:
         if st.button("Add ＋", key="chart_add", help="Add this symbol to Watchlist", type="secondary"):
             st.session_state.flash = add_to_watchlist(ticker)
@@ -1665,7 +1685,7 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
             "Yahoo Finance / yfinance; may be delayed."
         )
     if st.button("Open stock details"):
-        go_to("Markets", markets_tab="Stock")
+        go_to("Stock Research")
         st.rerun()
 
 
@@ -1692,32 +1712,37 @@ def load_universe(period: str) -> tuple[pd.DataFrame, pd.DataFrame, str]:
     return prices, metrics, error
 
 
-def remember_markets_tab() -> None:
-    if st.session_state.get("markets_tab"):
-        st.session_state.markets_tab_persist = st.session_state.markets_tab
+def render_markets(section: str) -> None:
+    """Render each market tool directly from the top navigation."""
+    descriptions = {
+        "Market Overview": "The wider market at a glance: group heatmaps, leading stocks, daily movers and volume.",
+        "Screener": "Find stocks by return, volatility and trading activity, then export your shortlist.",
+        "Live Quotes": "Follow intraday price, candles and volume, with a short list of symbols to monitor.",
+        "Returns & Risk": "Compare historical performance, volatility and drawdowns across stocks and ETFs.",
+        "Stock Research": "Explore one stock or index through price history, return metrics and company fundamentals.",
+    }
+    st.markdown(f'<div class="hero-title">{html.escape(section)}</div><p class="hero-sub">{html.escape(descriptions[section])}</p>', unsafe_allow_html=True)
 
-
-def render_markets() -> None:
-    apply_pending_markets_tab()
-    bind_widget("markets_tab", "markets_tab_persist", "Overview")
-    st.segmented_control("Markets", options=MARKET_TABS, key="markets_tab", on_change=remember_markets_tab)
-    tab = st.session_state.markets_tab
-
-    if tab == "Live quotes":
+    if section == "Live Quotes":
         render_live_quotes()
         return
-    if tab == "Stock":
+    if section == "Stock Research":
         render_stock_details()
         return
 
-    period = st.selectbox(
-        "Look-back window",
-        options=list(PERIOD_LABELS.keys()),
-        format_func=lambda x: PERIOD_LABELS[x],
-        key="analysis_period",
-    )
-    sector_options = ["All groups"] + sorted(set(UNIVERSE.values()))
-    selected_sector = st.selectbox("Group filter", options=sector_options, index=0)
+    period_col, group_col = st.columns(2, gap="medium")
+    with period_col:
+        period = st.selectbox(
+            "Look-back window",
+            options=list(PERIOD_LABELS.keys()),
+            format_func=lambda x: PERIOD_LABELS[x],
+            key="analysis_period",
+        )
+    selected_sector = "All groups"
+    if section != "Returns & Risk":
+        with group_col:
+            sector_options = ["All groups"] + sorted(set(UNIVERSE.values()))
+            selected_sector = st.selectbox("Group filter", options=sector_options, index=0, key="market_group_filter")
 
     prices, metrics, load_error = load_universe(period)
     if prices.empty:
@@ -1734,11 +1759,11 @@ def render_markets() -> None:
         active_tickers = list(UNIVERSE.keys())
     prices_active = prices[prices["ticker"].isin(active_tickers)].copy()
 
-    if tab == "Overview":
+    if section == "Market Overview":
         render_overview(prices, prices_active, metrics, metrics_view, period)
-    elif tab == "Screener":
+    elif section == "Screener":
         render_screener(metrics_view)
-    elif tab == "Returns & risk":
+    elif section == "Returns & Risk":
         render_risk(prices, metrics, period)
 
 
@@ -1766,13 +1791,13 @@ def render_overview(
     with left:
         fig_heat = make_monthly_sector_heatmap(prices_active)
         if fig_heat is not None:
-            st.plotly_chart(fig_heat, width="stretch", config={"displayModeBar": False})
+            help_chart(fig_heat, "heatmap", "heatmap", width="stretch", config={"displayModeBar": False})
         else:
             st.info("Not enough history in this window to draw the monthly heatmap.")
     with right:
         ranked = metrics_view.sort_values("Period return (%)", ascending=False).head(15)
         fig_rank = signed_hbar(ranked, "Period return (%)", "Ticker", "Top 15 in this window", "Period return")
-        st.plotly_chart(fig_rank, width="stretch", config={"displayModeBar": False})
+        help_chart(fig_rank, "ranking", "ranking", width="stretch", config={"displayModeBar": False})
 
     st.subheader("Today's movers in the starter list")
     stocks_only = metrics[~metrics["Ticker"].isin(["SPY", "QQQ", "DIA"])].copy()
@@ -1791,7 +1816,7 @@ def render_overview(
             gainers = pd.DataFrame()
         if not gainers.empty:
             fig_gainers = signed_hbar(gainers, "Day chg (%)", "Ticker", "Gainers · top 10", "Day change")
-            st.plotly_chart(fig_gainers, width="stretch", config={"displayModeBar": False})
+            help_chart(fig_gainers, "gainers", "gainers", width="stretch", config={"displayModeBar": False})
         else:
             st.info("Not enough data for a gainer list.")
     with movers_right:
@@ -1801,7 +1826,7 @@ def render_overview(
             losers = pd.DataFrame()
         if not losers.empty:
             fig_losers = signed_hbar(losers, "Day chg (%)", "Ticker", "Losers · bottom 10", "Day change")
-            st.plotly_chart(fig_losers, width="stretch", config={"displayModeBar": False})
+            help_chart(fig_losers, "losers", "losers", width="stretch", config={"displayModeBar": False})
         else:
             st.info("Not enough data for a loser list.")
 
@@ -1825,7 +1850,7 @@ def render_overview(
         )
         fig_volume_rank.update_xaxes(tickformat="~s", gridcolor=GRID_COLOR)
         fig_volume_rank.update_yaxes(showgrid=False)
-        st.plotly_chart(fig_volume_rank, width="stretch", config={"displayModeBar": False})
+        help_chart(fig_volume_rank, "volume", "volume", width="stretch", config={"displayModeBar": False})
 
     st.subheader("Starter universe")
     table_cols = ["Ticker", "Company", "Group", "Last", "Period return (%)", "Ann. volatility (%)", "Max drawdown (%)", "Avg volume", "Volume", "As of"]
@@ -1932,7 +1957,7 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
     )
     fig_line.update_xaxes(showgrid=False)
     fig_line.update_yaxes(gridcolor=GRID_COLOR, zeroline=False, side="right")
-    st.plotly_chart(fig_line, width="stretch", config={"displayModeBar": False})
+    help_chart(fig_line, "comparison", "comparison", width="stretch", config={"displayModeBar": False})
     st.caption("This is not the share price. Each series is rebased to 100 at the start of the window so you can compare percentage paths.")
     scat = metrics[metrics["Ticker"].isin(compare_tickers)].copy()
     if not scat.empty:
@@ -1949,7 +1974,7 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
         )
         fig_scatter.update_xaxes(gridcolor=GRID_COLOR)
         fig_scatter.update_yaxes(gridcolor=GRID_COLOR, zeroline=True, zerolinecolor="#b2b5be")
-        st.plotly_chart(fig_scatter, width="stretch", config={"displayModeBar": False})
+        help_chart(fig_scatter, "risk", "risk", width="stretch", config={"displayModeBar": False})
     st.caption("Past return and volatility describe history. They are not a forecast.")
 
 
@@ -1974,7 +1999,11 @@ def render_stock_details() -> None:
 
     period = st.selectbox("History window", options=list(PERIOD_LABELS.keys()), index=3, format_func=lambda x: PERIOD_LABELS[x], key="stock_period")
     with st.spinner("Loading this symbol…"):
-        one_prices = download_prices((focus,), period)
+        try:
+            one_prices = download_prices((focus,), period)
+        except Exception:
+            one_prices = pd.DataFrame()
+            st.warning("Could not load daily history. Check the network or Yahoo Finance, then retry.")
         series = download_ohlc(focus, period, "1d")
     if one_prices.empty and series.empty:
         st.warning("Yahoo did not return history for this symbol.")
@@ -1993,7 +2022,7 @@ def render_stock_details() -> None:
             last_px = float(m["Last"])
             prev_close = last_px / (1 + float(m["Day chg (%)"]) / 100) if float(m["Day chg (%)"]) != -100 else None
         price_fig = build_price_chart(series, focus, "Candle", previous_close=prev_close, range_key="1Y")
-        st.plotly_chart(price_fig, width="stretch", config={"displayModeBar": False})
+        help_chart(price_fig, "stock", "stock", width="stretch", config={"displayModeBar": False})
         st.caption("Daily OHLC candles. Weekends and holidays are hidden. Green = close ≥ open. Scale is zoomed to this window.")
 
     add_col, live_col = st.columns(2)
@@ -2001,7 +2030,7 @@ def render_stock_details() -> None:
         st.session_state.flash = add_to_watchlist(focus)
         st.rerun()
     if live_col.button("Open live quotes", width="stretch"):
-        go_to("Markets", markets_tab="Live quotes")
+        go_to("Live Quotes")
         st.rerun()
 
     with st.expander("Optional Yahoo fundamentals (often incomplete)", expanded=False):
@@ -2037,8 +2066,7 @@ def render_stock_details() -> None:
 
 
 def render_live_quotes() -> None:
-    st.subheader("Live quotes")
-    st.markdown("Intraday bars for one symbol, plus a short watchlist. This is a classroom feed, not an execution quote.")
+    st.caption("This is a classroom feed, not an execution quote.")
 
     universe_options = list(dict.fromkeys([st.session_state.selected_symbol, *UNIVERSE.keys()]))
     default_live = st.session_state.selected_symbol if st.session_state.selected_symbol in universe_options else "AAPL"
@@ -2132,10 +2160,11 @@ def render_live_quotes() -> None:
             m3.metric("Bar volume", f"{last_volume:,.0f}" if pd.notna(last_volume) else "—")
             m4.metric("Bars returned", f"{len(valid):,}")
 
-            live_fig = build_price_chart(valid, selected_symbol, "Candle", range_key="1D")
-            st.plotly_chart(live_fig, width="stretch", config={"displayModeBar": False})
+            live_fig = build_price_chart(valid, selected_symbol, "Candle", range_key="1D", include_extended=extended)
+            help_chart(live_fig, "intraday", "intraday", width="stretch", config={"displayModeBar": False})
             st.caption(
-                "Intraday OHLC candles on regular US hours only (nights hidden). "
+                ("Intraday OHLC candles including pre/post-market hours. " if extended else
+                 "Intraday OHLC candles on regular US hours only (nights hidden). ") +
                 "Green = that bar closed ≥ open. This is a classroom feed, not an exchange plot."
             )
 
@@ -2317,7 +2346,7 @@ def render_watchlist_page() -> None:
     with left:
         render_watchlist_panel(snap, show_remove=True)
         if st.button("Open live quotes for this list"):
-            go_to("Markets", markets_tab="Live quotes")
+            go_to("Live Quotes")
             st.rerun()
     with right:
         render_selected_chart(st.session_state.selected_symbol, snap)
@@ -2330,18 +2359,19 @@ def main() -> None:
     render_top_nav()
 
     nav = st.session_state.nav
-    if nav == "Home":
+    st.session_state.learn_embedded = nav == "Lesson"
+    if nav == "Lesson":
+        render_learning_page()
+    elif nav == "Home":
         render_home()
     elif nav == "Index":
         render_index_page()
-    elif nav == "Learn":
-        render_learn()
-    elif nav == "Markets":
-        render_markets()
-    elif nav == "Watchlist":
-        render_watchlist_page()
+    elif nav in TOP_NAV[1:]:
+        render_markets(nav)
     else:
         render_home()
+
+    render_study_launcher()
 
     st.markdown("---")
     st.markdown(

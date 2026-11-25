@@ -1,0 +1,91 @@
+<style>
+@SCOPE@ {
+  --ink:#131722; --muted:#6a6d78; --panel:#fff; --panel-2:#fff;
+  --line:#e0e3eb; --mint:#087f6d; --blue:#2962ff; --amber:#946200; --rose:#c63845;
+  color:var(--ink); background:#fff; min-width:0;
+}
+@SCOPE@ h1, @SCOPE@ h2, @SCOPE@ h3, @SCOPE@ h4,
+@SCOPE@ p, @SCOPE@ li, @SCOPE@ label, @SCOPE@ [data-testid="stMarkdownContainer"] {
+  color:var(--ink); letter-spacing:normal;
+}
+@SCOPE@ [data-testid="stCaptionContainer"] p {color:var(--muted);}
+@SCOPE@ [data-testid="stWidgetLabel"] p {color:var(--ink);}
+@SCOPE@ [data-testid="stExpander"], @SCOPE@ [data-testid="stExpander"] details,
+@SCOPE@ [data-testid="stExpander"] summary, @SCOPE@ [data-testid="stExpanderDetails"],
+@SCOPE@ [data-testid="stMetric"], @SCOPE@ [data-testid="stVerticalBlockBorderWrapper"],
+@SCOPE@ [data-testid="stVerticalBlock"] [data-testid="stVerticalBlockBorderWrapper"] {
+  background:#fff; color:var(--ink); border-color:var(--line); border-radius:14px;
+}
+@SCOPE@ [data-testid="stMetric"] {border:1px solid var(--line);padding:1rem;min-height:112px;}
+@SCOPE@ [data-testid="stMetricLabel"], @SCOPE@ [data-testid="stMetricValue"] {color:var(--ink);}
+@SCOPE@ [data-testid="stMetricValue"] {font-size:1.65rem;}
+@SCOPE@ [data-testid="stExpander"] summary:hover {background:#fff;color:var(--ink);}
+@SCOPE@ button, @SCOPE@ [data-testid="stBaseButton-secondary"],
+@SCOPE@ [data-testid="stFormSubmitButton"] button, @SCOPE@ input, @SCOPE@ textarea,
+@SCOPE@ [data-baseweb="select"] > div, @SCOPE@ [data-baseweb="input"] > div,
+@SCOPE@ [data-baseweb="textarea"] > div {
+  background:#fff; color:var(--ink); border-color:#c9ccd4; border-radius:10px;
+}
+@SCOPE@ button:hover {background:#fff;border-color:#131722;}
+@SCOPE@ button:focus-visible, @SCOPE@ label:focus-within {outline:2px solid #2962ff;outline-offset:2px;}
+@SCOPE@ [role="radiogroup"] {gap:.55rem;}
+@SCOPE@ [role="radiogroup"] label {
+  background:#fff; color:var(--ink); border:1px solid var(--line);border-radius:12px;padding:.65rem .8rem;
+}
+@SCOPE@ [role="radiogroup"] label:has(input:checked) {background:#fff;border-color:#131722;}
+@SCOPE@ [role="tablist"] {gap:.4rem;}
+@SCOPE@ [role="tab"] {background:#fff;color:var(--muted);white-space:normal;}
+@SCOPE@ [role="tab"][aria-selected="true"] {background:#fff;color:var(--ink);border-bottom-color:#131722;}
+@SCOPE@ [data-testid="stPlotlyChart"] {width:100%;max-width:100%;min-width:0;}
+@SCOPE@ [data-testid="stPlotlyChart"] > div {min-width:0;max-width:100%;}
+@SCOPE@ [data-testid="stAlert"] {background:#fff;border:1px solid var(--line);border-left:3px solid #2962ff;}
+@SCOPE@ .hero {background:#fff;border:1px solid var(--line);border-radius:18px;padding:1.6rem;margin-bottom:1.2rem;}
+@SCOPE@ .hero h1 {font-size:clamp(1.8rem,2.6vw,2.65rem);line-height:1.15;margin:.5rem 0 1rem;}
+@SCOPE@ .hero p {color:var(--muted);font-size:1rem;line-height:1.7;margin-bottom:0;}
+@SCOPE@ .eyebrow, @SCOPE@ .section-kicker {color:#087f6d;font-size:.8rem;font-weight:750;letter-spacing:.12em;text-transform:uppercase;}
+@SCOPE@ .section-title {color:var(--ink);font-size:1.5rem;font-weight:750;line-height:1.3;margin:.4rem 0;}
+@SCOPE@ .section-desc {color:var(--muted);line-height:1.6;margin-bottom:1.2rem;}
+@SCOPE@ .lesson-card, @SCOPE@ .info-card, @SCOPE@ .cycle-card, @SCOPE@ .statement-nav-card {
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:1rem;height:100%;
+}
+@SCOPE@ .statement-nav-card {margin-bottom:.7rem;}
+@SCOPE@ .statement-nav-card.is-active {background:#fff;border-color:#131722;}
+@SCOPE@ .lesson-title, @SCOPE@ .cycle-title, @SCOPE@ .statement-nav-title, @SCOPE@ .scenario-title {color:var(--ink);font-size:1.1rem;font-weight:750;line-height:1.4;margin:.4rem 0;}
+@SCOPE@ .lesson-text, @SCOPE@ .cycle-body, @SCOPE@ .statement-nav-copy, @SCOPE@ .scenario-subtitle,
+@SCOPE@ .info-card p, @SCOPE@ .scenario-source, @SCOPE@ .scenario-color-note {color:var(--muted);font-size:1rem;line-height:1.65;}
+@SCOPE@ .lesson-top {display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem;}
+@SCOPE@ .lesson-icon {font-size:1.5rem;}
+@SCOPE@ .lesson-no, @SCOPE@ .cycle-num, @SCOPE@ .statement-nav-number {color:var(--muted);font-size:.85rem;}
+@SCOPE@ .tag {display:inline-block;background:#fff;border:1px solid var(--line);border-radius:999px;padding:.3rem .6rem;color:#2962ff;font-size:.85rem;}
+@SCOPE@ .callout, @SCOPE@ .warning-callout {background:#fff;border:1px solid var(--line);border-left:3px solid #087f6d;border-radius:0 10px 10px 0;padding:.85rem 1rem;color:var(--ink);line-height:1.7;}
+@SCOPE@ .warning-callout {border-left-color:#946200;}
+@SCOPE@ .step-line {display:flex;gap:12px;align-items:flex-start;margin:.5rem 0 1rem;}
+@SCOPE@ .step-num, @SCOPE@ .scenario-index {background:#fff;border:1px solid var(--line);border-radius:10px;padding:.4rem .7rem;color:#087f6d;font-weight:750;}
+@SCOPE@ .step-body {color:var(--ink);line-height:1.6;}
+@SCOPE@ .scenario-intro {display:flex;align-items:flex-start;gap:.85rem;margin-bottom:.8rem;}
+@SCOPE@ .scenario-indicator-legend {display:flex;gap:.8rem;flex-wrap:wrap;margin:.5rem 0;}
+@SCOPE@ .color-pill {display:inline-block;background:#fff;border:1px solid currentColor;border-radius:999px;padding:.1rem .5rem;font-weight:700;}
+@SCOPE@ .color-up {color:#087f6d;}
+@SCOPE@ .color-down {color:#c63845;}
+@SCOPE@ .color-key-line {font-weight:700;}
+@SCOPE@ .ohlc-line {display:flex;justify-content:space-between;gap:.5rem;padding:.5rem;border-bottom:1px solid var(--line);}
+@SCOPE@ .quiz-review-card {background:#fff;border:1px solid var(--line);border-radius:14px;padding:1rem;margin:.8rem 0;}
+@SCOPE@ .quiz-correct {border-left:4px solid #087f6d;}
+@SCOPE@ .quiz-incorrect {border-left:4px solid #c63845;}
+@SCOPE@ .quiz-review-head {display:flex;justify-content:space-between;gap:.8rem;margin-bottom:.6rem;}
+@SCOPE@ .quiz-review-title {font-weight:750;}
+@SCOPE@ .quiz-review-status {font-size:.9rem;font-weight:700;}
+@SCOPE@ .quiz-correct .quiz-review-status, @SCOPE@ .answer-correct {color:#087f6d;}
+@SCOPE@ .quiz-incorrect .quiz-review-status, @SCOPE@ .answer-wrong {color:#c63845;}
+@SCOPE@ .quiz-review-option {background:#fff;border:1px solid var(--line);border-radius:9px;padding:.6rem;margin:.4rem 0;line-height:1.5;}
+@SCOPE@ .quiz-review-option .option-marker {font-weight:750;margin-right:.5rem;}
+@SCOPE@ .quiz-review-explanation {line-height:1.7;margin-top:.8rem;}
+@SCOPE@ hr {border-color:var(--line);}
+body:has(.learning-style-marker) [role="listbox"], body:has(.learning-style-marker) [role="option"],
+body:has(.learning-style-marker) [data-baseweb="popover"], body:has(.learning-style-marker) [data-baseweb="menu"] {background:#fff;color:#131722;}
+@media(max-width:760px) {
+  @SCOPE@ .hero {padding:1.1rem;}
+  @SCOPE@ .hero h1 {font-size:1.8rem;}
+  @SCOPE@ .quiz-review-head {flex-direction:column;}
+}
+</style>

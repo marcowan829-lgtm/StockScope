@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import pandas as pd
 
 try:
@@ -12,7 +11,7 @@ except Exception as exc:
     raise SystemExit(1)
 
 
-def test_symbol(symbol: str) -> None:
+def diagnose_symbol(symbol: str) -> None:
     print("\n" + "=" * 65)
     print(f"测试 {symbol} 的 1 分钟行情")
     print("=" * 65)
@@ -45,8 +44,8 @@ def test_symbol(symbol: str) -> None:
 
 def main() -> None:
     print("StockScope 分钟行情诊断")
-    test_symbol("NVDA")
-    test_symbol("BTC-USD")
+    diagnose_symbol("NVDA")
+    diagnose_symbol("BTC-USD")
     print("\n如果 NVDA 在周末停留在上一交易日的数据，属于可能出现的正常情况。")
     print("BTC-USD 全天候交易，但其更新时间不能用于推断美股行情延迟。")
     input("\n测试结束。按回车关闭窗口...")
