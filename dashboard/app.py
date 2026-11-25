@@ -62,6 +62,14 @@ INDEX_META = {
         "unit": "point",
         "badge": "500",
         "badge_bg": "#f23645",
+        "proxy": "SPY",
+        "members": "About 500 large US companies",
+        "about": (
+            "The S&P 500 is a single number that follows 500 large companies listed in the United States. "
+            "When this number rises, that slice of the market is generally up; when it falls, that slice is generally down. "
+            "You cannot buy the index itself. A fund such as SPY is a common way to follow it in a brokerage account."
+        ),
+        "related": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"],
     },
     "^NDX": {
         "display": "NDX",
@@ -70,6 +78,14 @@ INDEX_META = {
         "unit": "point",
         "badge": "100",
         "badge_bg": "#2962ff",
+        "proxy": "QQQ",
+        "members": "About 100 large non-financial Nasdaq names",
+        "about": (
+            "The Nasdaq 100 follows the largest non-financial companies listed on Nasdaq. "
+            "Technology names have a heavy weight, so this index can move more than the S&P 500 on tech news. "
+            "A fund such as QQQ is a common way to follow it."
+        ),
+        "related": ["NVDA", "AAPL", "MSFT", "AMZN", "META"],
     },
     "^DJI": {
         "display": "DJI",
@@ -78,6 +94,14 @@ INDEX_META = {
         "unit": "USD",
         "badge": "30",
         "badge_bg": "#131722",
+        "proxy": "DIA",
+        "members": "30 large US companies",
+        "about": (
+            "The Dow Jones Industrial Average follows 30 well-known US companies. "
+            "It is a short list, so one member can move the number more than in the S&P 500. "
+            "A fund such as DIA is a common way to follow it."
+        ),
+        "related": ["JPM", "UNH", "HD", "CAT", "MCD"],
     },
 }
 INDEX_ORDER = ["^GSPC", "^NDX", "^DJI"]
@@ -178,6 +202,23 @@ APP_STYLE = """
     min-height: 118px;
   }
   .index-card-top { display: flex; align-items: flex-start; gap: 0.7rem; }
+  .idx-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+  .idx-head-main { display: flex; align-items: flex-start; gap: 0.7rem; min-width: 0; }
+  .range-track {
+    position: relative; height: 8px; background: #eef0f5; border-radius: 99px; margin: 0.55rem 0 0.35rem 0;
+  }
+  .range-dot {
+    position: absolute; top: 50%; width: 12px; height: 12px; margin-top: -6px; margin-left: -6px;
+    background: #131722; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #c8ccd6;
+  }
+  .stat-chip {
+    border: 1px solid #e0e3eb; border-radius: 10px; padding: 0.65rem 0.75rem; background: #fff;
+  }
+  .stat-chip .k { color: #6a6d78; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .stat-chip .v { font-weight: 700; font-size: 1.02rem; font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
+  .about-box {
+    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #f7f8fa;
+  }
   .idx-badge {
     width: 36px; height: 36px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
@@ -219,10 +260,22 @@ APP_STYLE = """
   }
   div.st-key-nav_search input { background: transparent; }
   .nav-rule { border: 0; border-top: 1px solid #e0e3eb; margin: 0.1rem 0 0.85rem 0; }
-  div[class*="st-key-idx_"] button {
-    min-height: 2rem !important;
-    font-size: 0.8rem !important;
-    padding: 0.15rem 0.45rem !important;
+  div[class*="st-key-idx_add_"] button,
+  div[class*="st-key-idx_open_"] button {
+    min-width: 2.15rem !important;
+    min-height: 2.15rem !important;
+    height: 2.15rem !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    border: 1px solid #d8dbe3 !important;
+    background: #fff !important;
+    font-size: 0.95rem !important;
+    line-height: 1 !important;
+  }
+  div.st-key-idx_full_chart button,
+  div.st-key-idx_exit_full button,
+  div.st-key-idx_back button {
+    min-height: 2.1rem !important;
     border-radius: 8px !important;
   }
   div.st-key-chart_add button {
@@ -870,12 +923,49 @@ def go_to(nav: str, markets_tab: str | None = None, learn_tab: str | None = None
     st.session_state.nav = nav
     if nav in TOP_NAV:
         st.session_state.nav_pills = nav
+        st.session_state._last_nav_pill = nav
+        st.session_state.index_full_chart = False
     if markets_tab:
         st.session_state.markets_tab = markets_tab
         st.session_state.markets_tab_persist = markets_tab
     if learn_tab:
         st.session_state.learn_tab = learn_tab
         st.session_state.learn_tab_persist = learn_tab
+
+
+def open_index_page(ticker: str) -> None:
+    st.session_state.selected_symbol = ticker
+    st.session_state.nav = "Index"
+    st.session_state.index_full_chart = False
+    st.session_state.idx_switcher = ticker
+
+
+def trailing_return(prices: pd.DataFrame, ticker: str, days: int) -> float:
+    g = prices[prices["ticker"] == ticker].sort_values("date").dropna(subset=["close"])
+    if len(g) < 2:
+        return np.nan
+    last = float(g.iloc[-1]["close"])
+    cutoff = pd.Timestamp(g["date"].max()) - pd.Timedelta(days=days)
+    past = g[pd.to_datetime(g["date"]) <= cutoff]
+    if past.empty:
+        base = float(g.iloc[0]["close"])
+    else:
+        base = float(past.iloc[-1]["close"])
+    if not base:
+        return np.nan
+    return (last / base - 1) * 100
+
+
+def session_bar_stats(frame: pd.DataFrame) -> dict:
+    if frame.empty or not {"Open", "High", "Low", "Close"}.issubset(frame.columns):
+        return {}
+    return {
+        "open": float(frame["Open"].iloc[0]),
+        "high": float(frame["High"].max()),
+        "low": float(frame["Low"].min()),
+        "close": float(frame["Close"].iloc[-1]),
+        "volume": float(pd.to_numeric(frame["Volume"], errors="coerce").sum()) if "Volume" in frame.columns else np.nan,
+    }
 
 
 def add_to_watchlist(ticker: str) -> str:
@@ -931,8 +1021,11 @@ def resolve_search(query: str) -> dict:
 def on_search_change() -> None:
     result = resolve_search(st.session_state.get("nav_search", ""))
     st.session_state.search_result = result
-    if result.get("ticker"):
-        st.session_state.selected_symbol = result["ticker"]
+    ticker = result.get("ticker")
+    if ticker:
+        st.session_state.selected_symbol = ticker
+        if ticker in INDEX_META:
+            open_index_page(ticker)
 
 
 def bind_widget(key: str, persist_key: str, default) -> None:
@@ -951,6 +1044,16 @@ def remember_chart_range() -> None:
 def remember_chart_type() -> None:
     if st.session_state.get("chart_type"):
         st.session_state.chart_type_persist = st.session_state.chart_type
+
+
+def remember_idx_chart_range() -> None:
+    if st.session_state.get("idx_chart_range"):
+        st.session_state.idx_chart_range_persist = st.session_state.idx_chart_range
+
+
+def remember_idx_chart_type() -> None:
+    if st.session_state.get("idx_chart_type"):
+        st.session_state.idx_chart_type_persist = st.session_state.idx_chart_type
 
 
 def init_state() -> None:
@@ -972,6 +1075,11 @@ def init_state() -> None:
     st.session_state.setdefault("search_result", {})
     st.session_state.setdefault("flash", "")
     st.session_state.setdefault("analysis_period", "1y")
+    st.session_state.setdefault("index_full_chart", False)
+    st.session_state.setdefault("idx_chart_range_persist", "1D")
+    st.session_state.setdefault("idx_chart_type_persist", "Candle")
+    if st.session_state.idx_chart_type_persist not in CHART_TYPES:
+        st.session_state.idx_chart_type_persist = "Candle"
 
 
 def render_top_nav() -> None:
@@ -984,8 +1092,13 @@ def render_top_nav() -> None:
             if "nav_pills" not in st.session_state:
                 st.session_state.nav_pills = st.session_state.nav if st.session_state.nav in TOP_NAV else "Home"
             picked = st.pills("Section", TOP_NAV, key="nav_pills", label_visibility="collapsed")
-            if picked:
+            last_pill = st.session_state.get("_last_nav_pill")
+            if picked and picked != last_pill:
                 st.session_state.nav = picked
+                st.session_state.index_full_chart = False
+                st.session_state._last_nav_pill = picked
+            elif picked and st.session_state.get("nav") in TOP_NAV:
+                st.session_state._last_nav_pill = picked
     with right:
         st.text_input(
             "Search",
@@ -1011,46 +1124,55 @@ def render_top_nav() -> None:
         if go_col.button("Open", width="stretch"):
             st.session_state.selected_symbol = chosen
             st.session_state.search_result = {"ticker": chosen}
+            if chosen in INDEX_META:
+                open_index_page(chosen)
             st.rerun()
     if st.session_state.get("flash"):
         st.caption(st.session_state.flash)
 
 
-def index_card_html(ticker: str, snap_row: dict) -> str:
+def index_card_title_html(ticker: str) -> str:
     meta = INDEX_META[ticker]
-    last = snap_row.get("last", np.nan)
-    chg_pct = snap_row.get("chg_pct", np.nan)
-    klass = chg_class(chg_pct)
-    last_text = "—" if pd.isna(last) else f"{last:,.2f}"
-    chg_text = format_chg(chg_pct, True)
     return (
-        '<div class="index-card">'
-        '<div class="index-card-top">'
+        '<div class="idx-head-main">'
         f'<div class="idx-badge" style="background:{meta["badge_bg"]}">{html.escape(meta["badge"])}</div>'
         "<div>"
         f'<div class="idx-name">{html.escape(meta["name"])}<span class="idx-ticker">{html.escape(meta["display"])}</span></div>'
         f'<div class="idx-blurb">{html.escape(meta["blurb"])}</div>'
         "</div></div>"
+    )
+
+
+def index_card_quote_html(ticker: str, snap_row: dict) -> str:
+    last = snap_row.get("last", np.nan)
+    chg_pct = snap_row.get("chg_pct", np.nan)
+    last_text = "—" if pd.isna(last) else f"{last:,.2f}"
+    return (
         '<div class="idx-quote">'
-        f'<div class="last-px">{last_text}<span class="last-unit">{html.escape(meta["unit"])}</span></div>'
-        f'<div class="{klass}">{chg_text}</div>'
-        "</div></div>"
+        f'<div class="last-px">{last_text}<span class="last-unit">{html.escape(INDEX_META[ticker]["unit"])}</span></div>'
+        f'<div class="{chg_class(chg_pct)}">{html.escape(format_chg(chg_pct, True))}</div>'
+        "</div>"
     )
 
 
 def render_index_cards(snap: pd.DataFrame) -> None:
-    cards = "".join(index_card_html(ticker, lookup_snapshot(snap, ticker)) for ticker in INDEX_ORDER)
-    st.markdown(f'<div class="index-grid">{cards}</div>', unsafe_allow_html=True)
-    actions = st.columns(3)
-    labels = {
-        "^GSPC": "Chart S&P 500",
-        "^NDX": "Chart NASDAQ 100",
-        "^DJI": "Chart Dow Jones",
-    }
-    for col, ticker in zip(actions, INDEX_ORDER):
-        if col.button(labels[ticker], key=widget_key("idx_focus", ticker), type="secondary", width="stretch"):
-            st.session_state.selected_symbol = ticker
-            st.rerun()
+    cols = st.columns(3, gap="small")
+    for col, ticker in zip(cols, INDEX_ORDER):
+        meta = INDEX_META[ticker]
+        with col:
+            with st.container(border=True):
+                info, plus_col, open_col = st.columns([4.15, 0.55, 0.55])
+                with info:
+                    st.markdown(index_card_title_html(ticker), unsafe_allow_html=True)
+                with plus_col:
+                    if st.button("＋", key=widget_key("idx_add", ticker), help=f"Add {meta['proxy']} (tracks this index) to Watchlist"):
+                        st.session_state.flash = add_to_watchlist(meta["proxy"])
+                        st.rerun()
+                with open_col:
+                    if st.button("↗", key=widget_key("idx_open", ticker), help=f"Open {meta['name']} page"):
+                        open_index_page(ticker)
+                        st.rerun()
+                st.markdown(index_card_quote_html(ticker, lookup_snapshot(snap, ticker)), unsafe_allow_html=True)
 
 
 def watchlist_frame(tickers: Iterable[str], snap: pd.DataFrame) -> pd.DataFrame:
@@ -1145,6 +1267,239 @@ def render_watchlist_panel(snap: pd.DataFrame, *, show_remove: bool = False) -> 
                 remove_from_watchlist(drop)
                 st.rerun()
     st.caption("Click a row to show it on the chart. Quotes via Yahoo Finance; they may be delayed.")
+
+
+def _index_chart_figure(ticker: str, snap: pd.DataFrame, *, tall: bool = False) -> tuple[go.Figure | None, pd.DataFrame]:
+    bind_widget("idx_chart_range", "idx_chart_range_persist", "1D")
+    bind_widget("idx_chart_type", "idx_chart_type_persist", "Candle")
+    st.segmented_control(
+        "Chart type",
+        options=CHART_TYPES,
+        key="idx_chart_type",
+        on_change=remember_idx_chart_type,
+    )
+    st.pills(
+        "Range",
+        list(CHART_RANGES.keys()),
+        key="idx_chart_range",
+        on_change=remember_idx_chart_range,
+        label_visibility="collapsed",
+    )
+    range_key = st.session_state.get("idx_chart_range") or "1D"
+    if range_key not in CHART_RANGES:
+        range_key = "1D"
+    chart_type = st.session_state.get("idx_chart_type") or "Candle"
+    spec = CHART_RANGES[range_key]
+    with st.spinner("Loading index chart…"):
+        series = download_ohlc(ticker, spec["period"], spec["interval"])
+    if series.empty:
+        st.info("No bars for this range yet. Markets may be closed, or Yahoo did not return data.")
+        return None, series
+    quote = lookup_snapshot(snap, ticker)
+    prev_close = None
+    if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")):
+        prev_close = float(quote["last"]) - float(quote["chg"])
+    fig = build_price_chart(series, ticker, chart_type, previous_close=prev_close, range_key=range_key)
+    if tall:
+        fig.update_layout(height=720)
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False, "scrollZoom": True})
+    return fig, series
+
+
+def render_index_page() -> None:
+    ticker = st.session_state.selected_symbol
+    if ticker not in INDEX_META:
+        ticker = INDEX_ORDER[0]
+        st.session_state.selected_symbol = ticker
+    meta = INDEX_META[ticker]
+    proxy = meta["proxy"]
+
+    needed = tuple(dict.fromkeys([*INDEX_ORDER, proxy, *meta["related"]]))
+    with st.spinner("Loading index quotes…"):
+        try:
+            snap_prices = download_prices(needed, "5d")
+            history = download_prices((ticker,), "5y")
+            peers = download_prices(tuple(INDEX_ORDER), "1y")
+        except Exception:
+            snap_prices, history, peers = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    snap = snapshot_from_prices(snap_prices)
+    quote = lookup_snapshot(snap, ticker)
+
+    if st.session_state.get("index_full_chart"):
+        top_l, top_r = st.columns([3.4, 1])
+        with top_l:
+            st.markdown(
+                f'<p class="quote-name">{html.escape(meta["name"])}'
+                f'<span class="quote-ticker">{html.escape(meta["display"])}</span></p>',
+                unsafe_allow_html=True,
+            )
+        with top_r:
+            if st.button("Exit full chart", key="idx_exit_full", width="stretch"):
+                st.session_state.index_full_chart = False
+                st.rerun()
+        last = quote.get("last", np.nan)
+        chg = quote.get("chg", np.nan)
+        chg_pct = quote.get("chg_pct", np.nan)
+        st.markdown(
+            f'<div class="quote-last">{html.escape(format_last(ticker, last))} '
+            f'<span class="last-unit">{html.escape(meta["unit"].upper())}</span> '
+            f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
+            unsafe_allow_html=True,
+        )
+        _index_chart_figure(ticker, snap, tall=True)
+        st.caption("Full chart uses the same data as the index page. Weekends and closed hours stay hidden. Yahoo Finance; may be delayed.")
+        return
+
+    nav_l, nav_mid, nav_r = st.columns([1.35, 2.5, 2.3])
+    with nav_l:
+        if st.button("Back to home", key="idx_back"):
+            go_to("Home")
+            st.rerun()
+    with nav_mid:
+        picked = st.pills(
+            "Index",
+            INDEX_ORDER,
+            format_func=lambda t: INDEX_META[t]["display"],
+            key="idx_switcher",
+            label_visibility="collapsed",
+        )
+        if picked and picked != ticker:
+            open_index_page(picked)
+            st.rerun()
+    with nav_r:
+        add_c, full_c = st.columns(2)
+        with add_c:
+            if st.button(f"＋ {proxy}", key="idx_add_proxy", help=f"Add {proxy} to Watchlist", width="stretch"):
+                st.session_state.flash = add_to_watchlist(proxy)
+                st.rerun()
+        with full_c:
+            if st.button("Full chart", key="idx_full_chart", type="primary", width="stretch"):
+                st.session_state.index_full_chart = True
+                st.rerun()
+
+    st.markdown(
+        f'<p class="quote-name">{html.escape(meta["name"])}'
+        f'<span class="quote-ticker">{html.escape(meta["display"])}</span></p>'
+        f'<p class="hero-sub">{html.escape(meta["members"])} · {html.escape(meta["blurb"])}</p>',
+        unsafe_allow_html=True,
+    )
+    last = quote.get("last", np.nan)
+    chg = quote.get("chg", np.nan)
+    chg_pct = quote.get("chg_pct", np.nan)
+    st.markdown(
+        f'<div class="quote-last">{html.escape(format_last(ticker, last))} '
+        f'<span class="last-unit">{html.escape(meta["unit"].upper())}</span> '
+        f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
+        unsafe_allow_html=True,
+    )
+    now_et = pd.Timestamp.now(tz="America/New_York")
+    st.caption(f"{estimated_us_session(now_et)} · quotes via Yahoo Finance, may be delayed.")
+
+    _, series = _index_chart_figure(ticker, snap, tall=False)
+    st.caption("Same four chart types as Home. Closed-market hours are hidden so the line stays continuous.")
+
+    stats = session_bar_stats(series) if series is not None else {}
+    if stats:
+        range_key = st.session_state.get("idx_chart_range") or "1D"
+        window = "Session" if range_key == "1D" else "Range"
+        chips = st.columns(4)
+        labels = [
+            (f"{window} open", stats.get("open")),
+            (f"{window} high", stats.get("high")),
+            (f"{window} low", stats.get("low")),
+            ("Prev close", float(quote["last"]) - float(quote["chg"]) if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")) else np.nan),
+        ]
+        for col, (label, value) in zip(chips, labels):
+            shown = "—" if value is None or pd.isna(value) else f"{value:,.2f}"
+            col.markdown(f'<div class="stat-chip"><div class="k">{label}</div><div class="v">{shown}</div></div>', unsafe_allow_html=True)
+
+    left, right = st.columns([1.15, 1], gap="large")
+    with left:
+        st.markdown("##### What this index is")
+        st.markdown(f'<div class="about-box"><p>{html.escape(meta["about"])}</p></div>', unsafe_allow_html=True)
+
+        st.markdown("##### How it has moved")
+        horizons = [("1 month", 30), ("6 months", 182), ("1 year", 365), ("5 years", 365 * 5)]
+        mcols = st.columns(4)
+        for col, (label, days) in zip(mcols, horizons):
+            value = trailing_return(history, ticker, days) if not history.empty else np.nan
+            col.metric(label, format_chg(value, True) if pd.notna(value) else "—")
+
+        if not history.empty:
+            g = history[history["ticker"] == ticker].sort_values("date")
+            if not g.empty:
+                hi = float(g["close"].max())
+                lo = float(g["close"].min())
+                last_px = float(g["close"].iloc[-1])
+                span = hi - lo
+                pct_pos = 0 if span <= 0 else max(0, min(100, (last_px - lo) / span * 100))
+                st.markdown("##### 5-year range")
+                st.markdown(
+                    f'<div class="range-track"><div class="range-dot" style="left:{pct_pos:.1f}%"></div></div>'
+                    f'<div style="display:flex;justify-content:space-between;color:#6a6d78;font-size:0.82rem">'
+                    f"<span>Low {lo:,.2f}</span><span>Last {last_px:,.2f}</span><span>High {hi:,.2f}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+    with right:
+        st.markdown("##### The other US indices")
+        peer_rows = []
+        for peer in INDEX_ORDER:
+            row = lookup_snapshot(snap, peer)
+            peer_rows.append({
+                "Index": INDEX_META[peer]["display"],
+                "Last": format_last(peer, row.get("last", np.nan)),
+                "Chg%": format_chg(row.get("chg_pct", np.nan), True),
+            })
+        st.dataframe(pd.DataFrame(peer_rows), width="stretch", hide_index=True, height=148)
+
+        if not peers.empty:
+            pivot = peers.pivot_table(index="date", columns="ticker", values="close").dropna(how="all")
+            if not pivot.empty:
+                norm = pivot / pivot.bfill().iloc[0] * 100
+                fig_cmp = go.Figure()
+                colors = {"^GSPC": "#f23645", "^NDX": "#2962ff", "^DJI": "#131722"}
+                for col_name in INDEX_ORDER:
+                    if col_name not in norm.columns:
+                        continue
+                    fig_cmp.add_trace(go.Scatter(
+                        x=norm.index,
+                        y=norm[col_name],
+                        mode="lines",
+                        name=INDEX_META[col_name]["display"],
+                        line=dict(color=colors.get(col_name, "#131722"), width=1.8),
+                    ))
+                fig_cmp.update_layout(
+                    height=260, margin=dict(l=8, r=12, t=8, b=8),
+                    paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+                    hovermode="x unified",
+                    yaxis_title="Start = 100",
+                )
+                fig_cmp.update_xaxes(showgrid=False)
+                fig_cmp.update_yaxes(gridcolor=GRID_COLOR, zeroline=False)
+                restyle_chart(fig_cmp, height=260)
+                st.plotly_chart(fig_cmp, width="stretch", config={"displayModeBar": False})
+                st.caption("Each line starts at 100 one year ago, so you can compare path, not the raw index level.")
+
+        st.markdown("##### Names inside this index")
+        st.caption(f"{proxy} is a fund that tracks {meta['display']}. The names below are well-known members, not a complete list.")
+        rel = st.columns(len(meta["related"]))
+        for col, symbol in zip(rel, meta["related"]):
+            row = lookup_snapshot(snap, symbol)
+            label = f"{symbol} {format_chg(row.get('chg_pct', np.nan), True)}" if not pd.isna(row.get("chg_pct", np.nan)) else symbol
+            if col.button(label, key=f"idx_rel_{symbol}", width="stretch"):
+                st.session_state.selected_symbol = symbol
+                go_to("Home")
+                st.rerun()
+
+    st.markdown("##### How to read this page")
+    st.markdown(
+        "- **Full chart** hides the notes and enlarges the same quote chart.\n"
+        f"- **＋ {proxy}** adds a fund that follows this index to your watchlist. You cannot buy the index itself.\n"
+        "- Header change is versus the **previous close**, not versus the left edge of the chart.\n"
+        "- This is a classroom summary, not a trading terminal."
+    )
 
 
 def render_home() -> None:
@@ -1920,6 +2275,8 @@ def main() -> None:
     nav = st.session_state.nav
     if nav == "Home":
         render_home()
+    elif nav == "Index":
+        render_index_page()
     elif nav == "Learn":
         render_learn()
     elif nav == "Markets":
