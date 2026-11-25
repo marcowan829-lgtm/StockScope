@@ -1,0 +1,19 @@
+StockScope 启动失败排查
+
+推荐方法：
+1. 打开这个文件夹。
+2. 点击文件资源管理器顶部地址栏，输入 cmd，然后按 Enter。
+3. 在打开的命令提示符中执行：
+   python --version
+   python -m pip install -r requirements.txt
+   python -m streamlit run app.py
+4. 如果命令失败，窗口不会自动关闭。请复制最后 20-40 行错误信息发给 ChatGPT。
+
+如果提示 No module named streamlit：
+   python -m pip install streamlit
+
+如果 pip 下载时出现网络/超时错误，请检查网络后重试。
+如果提示 Python 版本不受某个依赖支持，请把完整错误信息发来，不要随意卸载现有 Python。
+
+仪表盘启动成功后，命令行应显示 Local URL，通常是 http://localhost:8501。
+请保持命令提示符窗口打开。
