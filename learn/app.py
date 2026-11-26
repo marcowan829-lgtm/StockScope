@@ -1763,21 +1763,24 @@ if chosen_page == 'Learning Home':
         for col, d in zip(row_cards, cards_data[row_start:row_start + 2]):
             with col:
                 status = t('✓ Completed') if d[5].split(" ", 1)[-1] in completed else t(d[4])
-                st.markdown(
-                    f'<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">{d[1]}</div><div class="lesson-no">LESSON {d[0]}</div></div><div class="lesson-title">{t(d[2])}</div><div class="lesson-text">{t(d[3])}</div><span class="tag">{status}</span></div>',
-                    unsafe_allow_html=True,
-                )
-                st.button(t('Open lesson →'), key=f"home_{d[0]}", width="stretch", on_click=nav_to, args=(d[5],))
+                with st.container(key=f"home_lesson_{d[0]}"):
+                    st.markdown(
+                        f'<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">{d[1]}</div><div class="lesson-no">LESSON {d[0]}</div></div><div class="lesson-title">{t(d[2])}</div><div class="lesson-text">{t(d[3])}</div><span class="tag">{status}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.button(t('Open lesson →'), key=f"home_{d[0]}", width="stretch", on_click=nav_to, args=(d[5],))
 
     st.write("")
     section_heading("TOOLS FOR LEARNING", 'Quizzes and data tools', 'Review the course in the final quiz or download cleaned historical data for study.')
     quick_a, quick_b = st.columns(2)
     with quick_a:
-        info_card("✓", 'Final Quiz', 'Check your understanding of stock basics, charts, company research, returns and risk.')
-        st.button(t('Start final quiz →'), key="home_open_comprehensive_quiz", width="stretch", on_click=nav_to, args=('Final Quiz',))
+        with st.container(key="home_tool_quiz"):
+            info_card("✓", 'Final Quiz', 'Check your understanding of stock basics, charts, company research, returns and risk.')
+            st.button(t('Start final quiz →'), key="home_open_comprehensive_quiz", width="stretch", on_click=nav_to, args=('Final Quiz',))
     with quick_b:
-        info_card("↗", 'Data & Methods', 'Review data sources, definitions and limitations; export a learning dataset.')
-        st.button(t('Open Data & Methods →'), key="home_open_data_methods", width="stretch", on_click=nav_to, args=('Data & Methods',))
+        with st.container(key="home_tool_data"):
+            info_card("↗", 'Data & Methods', 'Review data sources, definitions and limitations; export a learning dataset.')
+            st.button(t('Open Data & Methods →'), key="home_open_data_methods", width="stretch", on_click=nav_to, args=('Data & Methods',))
 
     st.write("")
     section_heading("START HERE", 'New to stocks? Remember these three ideas')
