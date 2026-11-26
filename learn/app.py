@@ -4,6 +4,7 @@ from typing import Iterable
 from pathlib import Path
 from html import escape
 import json
+import sys
 
 import numpy as np
 import pandas as pd
@@ -15,13 +16,24 @@ import streamlit.components.v1 as components
 import yfinance as yf
 
 
+def _bootstrap_i18n() -> None:
+    dashboard_dir = str(Path(__file__).resolve().parents[1] / "dashboard")
+    if dashboard_dir not in sys.path:
+        sys.path.insert(0, dashboard_dir)
+
+
+_bootstrap_i18n()
+from i18n import init_language, lang_key, peek_lang, plotly_font, render_language_toggle, t
+
+
 # ============================================================
 # Page setup and visual system
 # ============================================================
 _EMBEDDED = bool(st.session_state.get("learn_embedded", False))
 if not _EMBEDDED:
+    init_language()
     st.set_page_config(
-        page_title="StockScope Learn | Beginner Stock Academy",
+        page_title=t("StockScope Learn | Beginner Stock Academy") if peek_lang() == "zh-HK" else "StockScope Learn | Beginner Stock Academy",
         page_icon="📚", layout="wide", initial_sidebar_state="expanded",
     )
 _style_scope = ".st-key-learning_content" if _EMBEDDED else ".stApp"
@@ -145,7 +157,7 @@ LESSON_GUIDE = {
 
 
 def ticker_label(symbol: str) -> str:
-    return f"{symbol} · {TICKERS.get(symbol, symbol)}"
+    return f"{symbol} · {t(TICKERS.get(symbol, symbol))}"
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -217,7 +229,7 @@ def safe_prices(tickers: Iterable[str], period: str) -> tuple[pd.DataFrame, str 
     try:
         data = load_prices(tuple(dict.fromkeys(tickers)), period)
         if data.empty:
-            return data, 'No market data was returned. Check your connection or try again later.'
+            return data, t('No market data was returned. Check your connection or try again later.')
         return data, None
     except Exception as exc:
         return pd.DataFrame(columns=["date", "ticker", "open", "high", "low", "close", "volume"]), str(exc)
@@ -402,7 +414,7 @@ def dual_signal_figure(
         ),
         barmode="overlay", xaxis_rangeslider_visible=False,
         paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-        font=dict(color="#131722", family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, Arial, sans-serif", size=13),
+        font=dict(color="#131722", family=plotly_font(), size=13),
         hoverlabel=dict(bgcolor="#ffffff", font_color="#131722", font_size=13, bordercolor="#8ba2bd"),
     )
     fig.update_xaxes(
@@ -611,11 +623,11 @@ def style_fig(fig: go.Figure, height: int = 430) -> go.Figure:
         template="plotly_white",
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
-        font=dict(color="#131722", family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, Arial, sans-serif", size=13),
+        font=dict(color="#131722", family=plotly_font(), size=13),
         height=height,
         margin=dict(l=8, r=8, t=56, b=12),
         legend=dict(bgcolor="#ffffff", orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        hoverlabel=dict(bgcolor="#ffffff", font_color="#131722", font_size=13, font_family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, Arial, sans-serif"),
+        hoverlabel=dict(bgcolor="#ffffff", font_color="#131722", font_size=13, font_family=plotly_font()),
     )
     fig.update_xaxes(showgrid=False, zeroline=False, linecolor="rgba(180,204,232,.16)")
     fig.update_yaxes(gridcolor="rgba(180,204,232,.09)", zeroline=False, linecolor="rgba(180,204,232,.16)")
@@ -941,14 +953,14 @@ def technical_indicator_figure(
 
 def hero(title: str, subtitle: str, eyebrow: str = "STOCKSCOPE LEARN · BEGINNER STOCK ACADEMY") -> None:
     # Keep intentional title line breaks rather than letting HTML collapse them into spaces.
-    title_html = title.replace("""
+    title_html = t(title).replace("""
 """, "<br>")
     st.markdown(
         f"""
         <div class="hero">
-          <div class="eyebrow">{eyebrow}</div>
+          <div class="eyebrow">{t(eyebrow)}</div>
           <h1>{title_html}</h1>
-          <p>{subtitle}</p>
+          <p>{t(subtitle)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -956,9 +968,9 @@ def hero(title: str, subtitle: str, eyebrow: str = "STOCKSCOPE LEARN · BEGINNER
 
 
 def section_heading(kicker: str, title: str, desc: str | None = None) -> None:
-    st.markdown(f'<div class="section-kicker">{kicker}</div><div class="section-title">{title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-kicker">{t(kicker)}</div><div class="section-title">{t(title)}</div>', unsafe_allow_html=True)
     if desc:
-        st.markdown(f'<div class="section-desc">{desc}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-desc">{t(desc)}</div>', unsafe_allow_html=True)
 
 
 def escape_markdown_dollars(content: str) -> str:
@@ -967,9 +979,9 @@ def escape_markdown_dollars(content: str) -> str:
 
 
 def info_card(icon: str, title: str, body: str, tag: str | None = None) -> None:
-    tag_html = f'<span class="tag">{tag}</span>' if tag else ""
+    tag_html = f'<span class="tag">{t(tag)}</span>' if tag else ""
     st.markdown(
-        f'''<div class="info-card"><div style="font-size:1.35rem">{icon}</div><h4>{title}</h4><p>{body}</p><div style="margin-top:.8rem">{tag_html}</div></div>''',
+        f'''<div class="info-card"><div style="font-size:1.35rem">{icon}</div><h4>{t(title)}</h4><p>{t(body)}</p><div style="margin-top:.8rem">{tag_html}</div></div>''',
         unsafe_allow_html=True,
     )
 
@@ -1051,7 +1063,7 @@ def scroll_main_to_top(trigger: str) -> None:
 
 def show_data_warning(error: str | None) -> None:
     if error:
-        st.warning('Market data could not be loaded. You can still read the lesson; check your connection or try again later to use the charts.')
+        st.warning(t('Market data could not be loaded. You can still read the lesson; check your connection or try again later to use the charts.'))
         # Keep raw technical exceptions out of the visible UI to avoid a stray code-style panel.
 
 
@@ -1067,10 +1079,10 @@ def lesson_completion_button(lesson: str, key: str) -> None:
     """Let learners mark a lesson complete without a separate reflection form."""
     completed = set(st.session_state.get("completed_lessons", []))
     already_done = lesson in completed
-    label = '✓ Lesson completed' if already_done else 'Mark lesson complete'
+    label = t('✓ Lesson completed') if already_done else t('Mark lesson complete')
     if st.button(label, key=key, width="stretch", disabled=already_done,
                  on_click=mark_complete, args=(lesson,)):
-        st.success('Lesson marked complete.')
+        st.success(t('Lesson marked complete.'))
 
 
 # ============================================================
@@ -1538,19 +1550,19 @@ if _EMBEDDED:
 elif not st.session_state["main_sidebar_collapsed"]:
     with st.sidebar:
         st.markdown(
-            """
+            f"""
             <div class="brand-row">
               <div class="brand-mark">S</div>
-              <div><div class="brand-name">StockScope</div><div class="brand-sub">Learn · Market Basics</div></div>
+              <div><div class="brand-name">StockScope</div><div class="brand-sub">{t("Learn · Market Basics")}</div></div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if st.button('← Hide study path', key="collapse_main_sidebar", width="stretch"):
+        if st.button(t('← Hide study path'), key="collapse_main_sidebar", width="stretch"):
             st.session_state["main_sidebar_collapsed"] = True
             st.rerun()
-        st.markdown('**Your study path**')
-        chosen_page = st.radio('Navigation', PAGES, key="main_nav", label_visibility="collapsed")
+        st.markdown(f'**{t("Your study path")}**')
+        chosen_page = st.radio(t('Navigation'), PAGES, key="main_nav", label_visibility="collapsed", format_func=t)
         _previous_page = st.session_state.get("_last_main_nav_for_scroll")
         _page_changed = _previous_page is not None and _previous_page != chosen_page
         if "_scroll_sequence" not in st.session_state:
@@ -1561,17 +1573,19 @@ elif not st.session_state["main_sidebar_collapsed"]:
         st.markdown("---")
         completed = set(st.session_state["completed_lessons"])
         progress = len(completed.intersection(set(LESSON_GUIDE.keys()))) / len(LESSON_GUIDE)
-        st.caption('Course progress')
-        st.progress(progress, text=f'Completed {round(progress * 100)}%')
+        st.caption(t('Course progress'))
+        st.progress(progress, text=t('Completed {pct}%', pct=round(progress * 100)))
         quiz_stats = st.session_state.get("quiz_attempts", {})
         mastered_count = sum(bool(quiz_stats.get(name, {}).get("passed")) for name in LESSON_GUIDE)
-        st.caption('Knowledge checks passed at least once')
-        st.progress(mastered_count / len(LESSON_GUIDE), text=f'{mastered_count}/{len(LESSON_GUIDE)} lessons passed')
+        st.caption(t('Knowledge checks passed at least once'))
+        st.progress(mastered_count / len(LESSON_GUIDE), text=t('{n}/{total} lessons passed', n=mastered_count, total=len(LESSON_GUIDE)))
         st.markdown("---")
-        st.caption('Data sources')
-        st.caption('Yahoo Finance / yfinance (prototype)')
-        st.caption('Choose a history window on each chart page.')
-        st.caption('For learning; not investment advice.')
+        if not _EMBEDDED:
+            render_language_toggle()
+        st.caption(t('Data sources'))
+        st.caption(t('Yahoo Finance / yfinance (prototype)'))
+        st.caption(t('Choose a history window on each chart page.'))
+        st.caption(t('For learning; not investment advice.'))
 else:
     # The floating control remains available after the sidebar contents are hidden.
     st.markdown(
@@ -1589,7 +1603,7 @@ else:
         </style>""",
         unsafe_allow_html=True,
     )
-    if st.button('☰ Show study path', key="expand_main_sidebar"):
+    if st.button(t('☰ Show study path'), key="expand_main_sidebar"):
         st.session_state["main_sidebar_collapsed"] = False
         st.rerun()
     chosen_page = st.session_state.get("main_nav", 'Learning Home')
@@ -1623,11 +1637,11 @@ if chosen_page == 'Learning Home':
     completed = set(st.session_state["completed_lessons"])
     n_complete = len(completed.intersection(set(LESSON_GUIDE.keys())))
     m1, m2, m3 = st.columns(3)
-    m1.metric('Learning units', f'{len(LESSON_GUIDE)} units', 'From basic concepts to investor protection')
-    m2.metric('Interactive charts', '3+ types', 'Line · bar · scatter')
-    m3.metric('Your progress', f"{n_complete}/{len(LESSON_GUIDE)}", 'Completed lessons')
+    m1.metric(t('Learning units'), t('{n} units', n=len(LESSON_GUIDE)), t('From basic concepts to investor protection'))
+    m2.metric(t('Interactive charts'), t('3+ types'), t('Line · bar · scatter'))
+    m3.metric(t('Your progress'), f"{n_complete}/{len(LESSON_GUIDE)}", t('Completed lessons'))
     mastered = sum(bool(st.session_state.get("quiz_attempts", {}).get(name, {}).get("passed")) for name in LESSON_GUIDE)
-    st.caption(f'Knowledge checks: {mastered}/{len(LESSON_GUIDE)} lessons passed at least once. You can retry. Passing a check and marking a lesson complete are separate actions.')
+    st.caption(t('Knowledge checks: {mastered}/{total} lessons passed at least once. You can retry. Passing a check and marking a lesson complete are separate actions.', mastered=mastered, total=len(LESSON_GUIDE)))
 
     st.write("")
     section_heading("REAL-WORLD CHALLENGE", 'Historical Market Challenge', 'Read real historical prices, make your own judgement, then reveal what happened. This exercise does not show that indicators can reliably predict prices.')
@@ -1635,10 +1649,10 @@ if chosen_page == 'Learning Home':
     # 01 — A real historical case, with no explicit signal clue until after submission.
     with st.container(border=True):
         st.markdown(
-            '<div class="scenario-intro"><div class="scenario-index">01</div><div><div class="scenario-title">Chart challenge | What happens next?</div><div class="scenario-subtitle">Study historical candles, volume, SMA 5 / SMA 20 and MACD (12, 26, 9). Make your judgement, then reveal the next 20 trading days. Signal markers appear only after submission.</div></div></div>', unsafe_allow_html=True,
+            f'<div class="scenario-intro"><div class="scenario-index">01</div><div><div class="scenario-title">{t("Chart challenge | What happens next?")}</div><div class="scenario-subtitle">{t("Study historical candles, volume, SMA 5 / SMA 20 and MACD (12, 26, 9). Make your judgement, then reveal the next 20 trading days. Signal markers appear only after submission.")}</div></div></div>', unsafe_allow_html=True,
         )
         st.markdown(
-            '<div class="callout scenario-color-key"><b>Chart colours:</b><span class="color-pill color-up">Green = up</span> <span class="color-pill color-down">Red = down</span> <span class="color-key-line" style="color:#a66a00">Amber = SMA 5</span> <span class="color-key-line" style="color:#2563eb">Blue = SMA 20</span><br><span class="scenario-color-note">Volume uses each candle’s colour. MACD histogram colours show positive/negative values, not the stock’s direction.</span></div>', unsafe_allow_html=True,
+            f'<div class="callout scenario-color-key"><b>{t("Chart colours:")}</b><span class="color-pill color-up">{t("Green = up")}</span> <span class="color-pill color-down">{t("Red = down")}</span> <span class="color-key-line" style="color:#a66a00">{t("Amber = SMA 5")}</span> <span class="color-key-line" style="color:#2563eb">{t("Blue = SMA 20")}</span><br><span class="scenario-color-note">{t("Volume uses each candle’s colour. MACD histogram colours show positive/negative values, not the stock’s direction.")}</span></div>', unsafe_allow_html=True,
         )
         try:
             signal_case = load_dual_golden_cross_case()
@@ -1687,21 +1701,22 @@ if chosen_page == 'Learning Home':
                         )
                     with answer_col:
                         with st.container(border=True):
-                            st.markdown('### Your judgement')
+                            st.markdown(f'### {t("Your judgement")}')
                             st.markdown(
                                 f'Study the prices through **{signal_date:%Y-%m-%d}** on the left. Consider prices relative to the averages, volume, and both MACD lines and the histogram.'
                             )
-                            st.markdown("**Question:** Compared with the signal day's close, where will the close be 20 trading days later?")
-                            st.caption('Classification: above +1% = rise; below −1% = fall; −1% to +1% = little change.')
+                            st.markdown(f"**{t('Question: Compared with the signal day\'s close, where will the close be 20 trading days later?')}**")
+                            st.caption(t('Classification: above +1% = rise; below −1% = fall; −1% to +1% = little change.'))
                             with st.form("home_scenario_01_form"):
                                 scenario_01_answer = st.radio(
-                                    'Choose your judgement:', answer_options, index=None,
+                                    t('Choose your judgement:'), answer_options, index=None,
                                     key="home_scenario_01_answer",
+                                    format_func=t,
                                 )
-                                scenario_01_submit = st.form_submit_button('Reveal what happened', width="stretch")
+                                scenario_01_submit = st.form_submit_button(t('Reveal what happened'), width="stretch")
                             if scenario_01_submit:
                                 if scenario_01_answer is None:
-                                    st.warning('Choose an answer before revealing the result.')
+                                    st.warning(t('Choose an answer before revealing the result.'))
                                 else:
                                     st.session_state["home_scenario_01_result"] = scenario_01_answer
                                     st.rerun()
@@ -1732,7 +1747,7 @@ if chosen_page == 'Learning Home':
                 )
 
     st.write("")
-    section_heading("YOUR LEARNING PATH", f'A beginner path of {len(LESSON_GUIDE)} learning units', 'Each lesson includes concepts, examples, exploration or practice. Study in order or revisit any topic.')
+    section_heading("YOUR LEARNING PATH", t('A beginner path of {n} learning units', n=len(LESSON_GUIDE)), 'Each lesson includes concepts, examples, exploration or practice. Study in order or revisit any topic.')
     cards_data = [
         ("01", "📘", 'Stock Market Basics', 'Stocks, bonds, indices, ETFs, exchanges and market capitalization.', 'Core concepts', '01 Stock Market Basics'),
         ("02", "📊", 'Reading Stock Charts', 'Candles, volume, quotes and timeframes.', 'Interactive charts', '02 Reading Stock Charts'),
@@ -1747,22 +1762,22 @@ if chosen_page == 'Learning Home':
         row_cards = st.columns(2)
         for col, d in zip(row_cards, cards_data[row_start:row_start + 2]):
             with col:
-                status = '✓ Completed' if d[5].split(" ", 1)[-1] in completed else d[4]
+                status = t('✓ Completed') if d[5].split(" ", 1)[-1] in completed else t(d[4])
                 st.markdown(
-                    f'<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">{d[1]}</div><div class="lesson-no">LESSON {d[0]}</div></div><div class="lesson-title">{d[2]}</div><div class="lesson-text">{d[3]}</div><span class="tag">{status}</span></div>',
+                    f'<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">{d[1]}</div><div class="lesson-no">LESSON {d[0]}</div></div><div class="lesson-title">{t(d[2])}</div><div class="lesson-text">{t(d[3])}</div><span class="tag">{status}</span></div>',
                     unsafe_allow_html=True,
                 )
-                st.button('Open lesson →', key=f"home_{d[0]}", width="stretch", on_click=nav_to, args=(d[5],))
+                st.button(t('Open lesson →'), key=f"home_{d[0]}", width="stretch", on_click=nav_to, args=(d[5],))
 
     st.write("")
     section_heading("TOOLS FOR LEARNING", 'Quizzes and data tools', 'Review the course in the final quiz or download cleaned historical data for study.')
     quick_a, quick_b = st.columns(2)
     with quick_a:
         info_card("✓", 'Final Quiz', 'Check your understanding of stock basics, charts, company research, returns and risk.')
-        st.button('Start final quiz →', key="home_open_comprehensive_quiz", width="stretch", on_click=nav_to, args=('Final Quiz',))
+        st.button(t('Start final quiz →'), key="home_open_comprehensive_quiz", width="stretch", on_click=nav_to, args=('Final Quiz',))
     with quick_b:
         info_card("↗", 'Data & Methods', 'Review data sources, definitions and limitations; export a learning dataset.')
-        st.button('Open Data & Methods →', key="home_open_data_methods", width="stretch", on_click=nav_to, args=('Data & Methods',))
+        st.button(t('Open Data & Methods →'), key="home_open_data_methods", width="stretch", on_click=nav_to, args=('Data & Methods',))
 
     st.write("")
     section_heading("START HERE", 'New to stocks? Remember these three ideas')
@@ -1801,11 +1816,11 @@ elif chosen_page == '01 Stock Market Basics':
         info_card("⚖️", 'Returns and risk', 'Returns may come from price changes and dividends. Risks include falling prices, a weakening business, limited liquidity and concentrated holdings.', 'Investment judgement')
 
     lesson_tabs = st.tabs([
-        '01 What a share represents',
-        '02 How markets work',
-        '03 Common investment products',
-        '04 Prices and returns',
-        '05 Risk and getting started',
+        t('01 What a share represents'),
+        t('02 How markets work'),
+        t('03 Common investment products'),
+        t('04 Prices and returns'),
+        t('05 Risk and getting started'),
     ])
 
     with lesson_tabs[0]:
@@ -2004,11 +2019,12 @@ elif chosen_page == '02 Reading Stock Charts':
     hero('Lesson 02 | Reading Stock Charts', 'Look beyond red and green. Read the open, high, low, close and volume behind a candle.', "LESSON 02 · READ THE CHART")
     left, right = st.columns([1.05, 2.0])
     with left:
-        symbol = st.selectbox('Choose a stock', list(TICKERS.keys()), index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key="chart_ticker")
+        symbol = st.selectbox(t('Choose a stock'), list(TICKERS.keys()), index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key=lang_key("chart_ticker"))
         # Migrate a previously selected period that is no longer offered in this chart.
-        if st.session_state.get("chart_period") == "5y":
-            st.session_state["chart_period"] = "3mo"
-        lesson_period = st.selectbox('History window', ["1mo", "3mo", "6mo", "1y"], index=1, format_func=lambda x: PERIODS[x], key="chart_period")
+        chart_period_key = lang_key("chart_period")
+        if st.session_state.get(chart_period_key) == "5y" or st.session_state.get("chart_period") == "5y":
+            st.session_state[chart_period_key] = "3mo"
+        lesson_period = st.selectbox(t('History window'), ["1mo", "3mo", "6mo", "1y"], index=1, format_func=lambda x: t(PERIODS[x]), key=chart_period_key)
         st.markdown('<div class="callout">Start with three months. Hover over candles and inspect the OHLC values one by one.</div>', unsafe_allow_html=True)
         st.markdown('#### Five chart essentials')
         st.markdown("""**Open:** price at the start of the bar.
@@ -2168,8 +2184,8 @@ elif chosen_page == '02A Candlestick Patterns':
     section_heading("STEP 2 · REAL MARKET", 'Practise on historical prices', 'Illustrations teach structure; real charts develop observation. Describe the prior trend first and avoid forcing an unclear shape into a pattern name.')
     real_left, real_right = st.columns([1, 2], gap="large")
     with real_left:
-        real_symbol = st.selectbox('Real stock / ETF', list(TICKERS.keys()), index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key="candle_real_symbol")
-        real_period = st.selectbox('History range', ["5d", "1mo", "3mo", "6mo", "1y"], index=2, format_func=lambda x: PERIODS[x], key="candle_real_period")
+        real_symbol = st.selectbox(t('Real stock / ETF'), list(TICKERS.keys()), index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key=lang_key("candle_real_symbol"))
+        real_period = st.selectbox(t('History range'), ["5d", "1mo", "3mo", "6mo", "1y"], index=2, format_func=lambda x: t(PERIODS[x]), key=lang_key("candle_real_period"))
         st.markdown('<div class="callout">Practice in this order: ① Check the earlier trend. ② Compare the body and wicks. ③ Notice where the pattern appears. ④ Check whether the next candles support the idea.</div>', unsafe_allow_html=True)
     real_data, real_error = safe_prices([real_symbol], real_period)
     show_data_warning(real_error)
@@ -2249,20 +2265,21 @@ elif chosen_page == '02B Technical Indicators':
     control_a, control_b, control_c = st.columns([1.05, 1.05, 1.7], gap="medium")
     with control_a:
         tech_symbol = st.selectbox(
-            'Choose a stock / ETF', list(TICKERS.keys()),
-            index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key="tech_lab_symbol",
+            t('Choose a stock / ETF'), list(TICKERS.keys()),
+            index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key=lang_key("tech_lab_symbol"),
         )
     with control_b:
         # Migrate the old session value before the widget is created.
-        if st.session_state.get("tech_lab_period") == "5y":
-            st.session_state["tech_lab_period"] = "3mo"
+        tech_period_key = lang_key("tech_lab_period")
+        if st.session_state.get(tech_period_key) == "5y" or st.session_state.get("tech_lab_period") == "5y":
+            st.session_state[tech_period_key] = "3mo"
         tech_period = st.selectbox(
-            'History range', ["1mo", "3mo", "6mo", "1y"], index=1,
-            format_func=lambda value: PERIODS[value], key="tech_lab_period",
+            t('History range'), ["1mo", "3mo", "6mo", "1y"], index=1,
+            format_func=lambda value: t(PERIODS[value]), key=tech_period_key,
         )
     with control_c:
         tech_indicator_choice = st.selectbox(
-            'Choose one indicator',
+            t('Choose one indicator'),
             [
                 'Candles only',
                 'MA | Simple Moving Average (SMA 5 / SMA 20)',
@@ -2280,7 +2297,8 @@ elif chosen_page == '02B Technical Indicators':
             ],
             index=0,
             key="tech_lab_indicator_choice",
-            help='Choose one tool at a time. SMA, EMA, Bollinger Bands, Support and Resistance, and Fibonacci Retracement appear on the price chart. RSI, MACD, Stochastic, ADX and OBV appear below it.',
+            format_func=t,
+            help=t('Choose one tool at a time. SMA, EMA, Bollinger Bands, Support and Resistance, and Fibonacci Retracement appear on the price chart. RSI, MACD, Stochastic, ADX and OBV appear below it.'),
         )
 
     # Enforce one indicator family at a time. This avoids stacked overlays hiding the candles.
@@ -2461,7 +2479,7 @@ elif chosen_page == '03 How Orders Work':
         st.markdown(f'<div class="step-line"><div class="step-num">{num}</div><div class="step-body"><b>{title}</b><br>{body}</div></div>', unsafe_allow_html=True)
 
     section_heading("ORDER TYPES", 'How do three common order types differ?')
-    order_tabs = st.tabs(['Market order', 'Limit order', 'Stop order'])
+    order_tabs = st.tabs([t('Market order'), t('Limit order'), t('Stop order')])
     with order_tabs[0]:
         st.markdown("""
 A **market order** aims to buy or sell promptly at the best available market price. It puts more emphasis on execution than on a fixed price.
@@ -2838,7 +2856,7 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
     elif lesson_section == '04 · Research a Real Company':
         section_heading("APPLY TO A REAL COMPANY", 'Apply the method to a real company', 'Start with official filings. Data summaries can help locate numbers, but do not cover everything.')
         stock_symbols = [s for s in TICKERS.keys() if s not in {"SPY", "QQQ", "EFA", "EEM", "EWJ", "FXI"}]
-        real_symbol = st.selectbox('Choose a company', stock_symbols, format_func=ticker_label, key="company_real_lookup_symbol")
+        real_symbol = st.selectbox(t('Choose a company'), stock_symbols, format_func=ticker_label, key=lang_key("company_real_lookup_symbol"))
         st.markdown('**Start with official filings.** Find US company disclosures through SEC EDGAR on the Data & Methods page.')
         st.caption("Start with the 10-K annual report and 10-Q quarterly report: business description, risk factors, Management's Discussion and Analysis (MD&A), and the three financial statements. Investor Relations pages can help; check filing and announcement dates.")
         if st.button('Try loading a company summary from the data service', key="company_fetch_yahoo_info"):
@@ -3281,8 +3299,8 @@ The explanations and examples are independently written and do not represent IBK
 
 These resources primarily address the US. Broker authorization, taxes, trading, settlement and investor protection vary elsewhere. Check your local regulator and broker's documents.
 """)
-    method_period = st.selectbox('Create a downloadable dataset', list(PERIODS.keys()), index=4, format_func=lambda x: PERIODS[x], key="method_period")
-    method_symbols = st.multiselect('Choose symbols', list(TICKERS.keys()), default=["AAPL", "MSFT", "NVDA", "SPY", "QQQ"], format_func=ticker_label, key="method_symbols")
+    method_period = st.selectbox(t('Create a downloadable dataset'), list(PERIODS.keys()), index=4, format_func=lambda x: t(PERIODS[x]), key=lang_key("method_period"))
+    method_symbols = st.multiselect(t('Choose symbols'), list(TICKERS.keys()), default=["AAPL", "MSFT", "NVDA", "SPY", "QQQ"], format_func=ticker_label, key=lang_key("method_symbols"))
     if st.button('Load and clean data', key="method_fetch"):
         method_data, method_error = safe_prices(method_symbols, method_period)
         st.session_state["method_data"] = method_data

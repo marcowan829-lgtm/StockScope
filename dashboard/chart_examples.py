@@ -1,6 +1,8 @@
 """Small, annotated SVG lessons. All figures are fictional teaching examples."""
 from html import escape
 
+from i18n import is_zh, t
+
 
 INK = "#263449"
 GREEN = "#087f68"
@@ -50,11 +52,13 @@ def _note(prefix, number, x, y, lines, target, width=198):
     card = f'<g transform="rotate({-1 if number != 2 else 1} {x + width / 2} {y + height / 2})"><rect x="{x}" y="{y}" width="{width}" height="{height}" rx="8" fill="{tint}" stroke="{colour}" stroke-opacity=".25"/><circle cx="{x + 18}" cy="{y + 20}" r="11" fill="{colour}"/>'
     card += _text(x + 18, y + 24, number, size=13, colour="#fff", anchor="middle", weight=700)
     for i, content in enumerate(lines):
-        card += f'<text x="{x + 36}" y="{y + 22 + i * 19}" font-size="13.5" fill="{INK}" font-family="Chalkboard SE, Comic Sans MS, Trebuchet MS, sans-serif">{escape(content)}</text>'
+        card += f'<text x="{x + 36}" y="{y + 22 + i * 19}" font-size="13.5" fill="{INK}" font-family="Microsoft JhengHei, PingFang HK, Chalkboard SE, Comic Sans MS, Trebuchet MS, sans-serif">{escape(content)}</text>'
     return arrow + card + '</g>'
 
 
-def _axes(*, y_label="Price ($)", x_label="Time →", zero_y=302):
+def _axes(*, y_label=None, x_label=None, zero_y=302):
+    y_label = t("Price ($)") if y_label is None else y_label
+    x_label = t("Time →") if x_label is None else x_label
     marks = ''.join(_line(65, y, 382, y, "#e8e7e0", 1) for y in (160, 210, 260))
     return (marks + _line(65, 137, 65, zero_y, "#8190a3")
             + _line(65, zero_y, 382, zero_y, "#8190a3")
@@ -76,14 +80,14 @@ def _price(topic, prefix):
                 body += _line(cross_x, y(100), xs[i + 1], y(b), GREEN if b >= 100 else RED, 3)
             else:
                 body += _line(xs[i], y(a), xs[i + 1], y(b), GREEN if max(a, b) > 100 else RED, 3)
-        body += _text(60, y(100) - 5, "$100 reference", size=12)
+        body += _text(60, y(100) - 5, t("$100 reference"), size=12)
         body += _text(145, y(98) + 18, "$98", colour=RED, anchor="middle")
         body += _text(210, y(99) - 12, "$99", colour=RED, anchor="middle")
         body += _text(290, y(102) - 10, "$102", colour=GREEN, anchor="middle")
         body += _ring(179, 260, 46, 27)
-        return (body + _note(prefix, 1, 12, 49, ["Find the", "$100 reference."], (335, y(100)))
-                + _note(prefix, 2, 230, 49, ["Above = green", "Below = red"], (290, y(102)))
-                + _note(prefix, 3, 94, 357, ["$98 → $99 rises,", "but stays red!"], (179, 270)))
+        return (body + _note(prefix, 1, 12, 49, [t("Find the"), t("$100 reference.")], (335, y(100)))
+                + _note(prefix, 2, 230, 49, [t("Above = green"), t("Below = red")], (290, y(102)))
+                + _note(prefix, 3, 94, 357, [t("$98 → $99 rises,"), t("but stays red!")], (179, 270)))
     values = [100, 103, 101, 107, 106, 110] if topic == "price_line" else [50, 51, 50.5, 53.5, 53, 55]
     xs = [80, 137, 194, 251, 308, 365]
     low, high = values[0], values[-1]
@@ -97,12 +101,12 @@ def _price(topic, prefix):
         body += f'<circle cx="{x}" cy="{y}" r="4" fill="{GREEN}"/>'
     body += _text(76, 272, f'${low:g}', anchor="end", size=12)
     body += _text(367, 148, f'${high:g}', colour=GREEN, weight=700)
-    body += _text(80, 323, "Start", size=12)
+    body += _text(80, 323, t("Start"), size=12)
     body += _ring(380, 144, 26, 14)
     change = (high / low - 1) * 100
-    note3 = ["Read the top edge.", "Shading ≠ volume!"] if topic == "price_area" else [f"${low:g} → ${high:g}", f"That's a +{change:.0f}% change."]
-    return (body + _note(prefix, 1, 12, 49, ["Read from earlier", "to later →"], (183, 302))
-            + _note(prefix, 2, 230, 49, ["Higher on the page", "= higher price."], (365, 160))
+    note3 = [t("Read the top edge."), t("Shading ≠ volume!")] if topic == "price_area" else [f"${low:g} → ${high:g}", t("That's a +{change:.0f}% change.", change=change)]
+    return (body + _note(prefix, 1, 12, 49, [t("Read from earlier"), t("to later →")], (183, 302))
+            + _note(prefix, 2, 230, 49, [t("Higher on the page"), t("= higher price.")], (365, 160))
             + _note(prefix, 3, 94, 357, note3, (265, 250) if topic == "price_area" else (308, ys[4])))
 
 
@@ -118,22 +122,22 @@ def _candles(topic, prefix):
         for value in [high, low]:
             body += _line(x - 8, y(value), x + 8, y(value), colour, 2)
     open_, high, low, close = first
-    body += _text(127, y(close) + 4, f'Close ${close}', size=12, anchor="end")
-    body += _text(127, y(open_) + 4, f'Open ${open_}', size=12, anchor="end")
-    body += _text(173, y(high) + 4, f'High ${high}', size=12)
-    body += _text(173, y(low) + 4, f'Low ${low}', size=12)
-    body += _text(65, 302, "Volume", size=12)
+    body += _text(127, y(close) + 4, t("Close ${close}", close=close), size=12, anchor="end")
+    body += _text(127, y(open_) + 4, t("Open ${open}", open=open_), size=12, anchor="end")
+    body += _text(173, y(high) + 4, t("High ${high}", high=high), size=12)
+    body += _text(173, y(low) + 4, t("Low ${low}", low=low), size=12)
+    body += _text(65, 302, t("Volume"), size=12)
     body += f'<rect x="134" y="318" width="34" height="16" fill="{GREEN}"/><rect x="274" y="302" width="34" height="32" fill="{RED}"/>'
-    body += _text(151, 348, "10:00" if topic == "intraday" else "Day 1", anchor="middle", size=12)
-    body += _text(291, 348, "10:05" if topic == "intraday" else "Day 2", anchor="middle", size=12)
-    return (body + _note(prefix, 1, 12, 49, ["Body = start", "to finish."], (151, (y(open_) + y(close)) / 2))
-            + _note(prefix, 2, 230, 49, ["Thin wicks show", "the high + low."], (151, y(high)))
-            + _note(prefix, 3, 94, 357, ["Taller volume bar", "= more shares traded."], (291, 310)))
+    body += _text(151, 348, "10:00" if topic == "intraday" else t("Day 1"), anchor="middle", size=12)
+    body += _text(291, 348, "10:05" if topic == "intraday" else t("Day 2"), anchor="middle", size=12)
+    return (body + _note(prefix, 1, 12, 49, [t("Body = start"), t("to finish.")], (151, (y(open_) + y(close)) / 2))
+            + _note(prefix, 2, 230, 49, [t("Thin wicks show"), t("the high + low.")], (151, y(high)))
+            + _note(prefix, 3, 94, 357, [t("Taller volume bar"), t("= more shares traded.")], (291, 310)))
 
 
 def _heatmap(prefix):
     body = ''
-    months, groups = ["Jan", "Feb", "Mar"], ["Tech", "Energy"]
+    months, groups = [t("Jan"), t("Feb"), t("Mar")], [t("Tech"), t("Energy")]
     values = [[4, -2, 1], [-3, 3, 0]]
     for col, month in enumerate(months):
         body += _text(136 + col * 90, 146, month, anchor="middle")
@@ -145,10 +149,10 @@ def _heatmap(prefix):
             body += f'<rect x="{x}" y="{y}" width="84" height="58" rx="5" fill="{fill}"/>'
             body += _text(x + 42, y + 34, f'{value:+d}%' if value else '0%', anchor="middle", size=17, weight=700)
     body += _ring(136, 191, 35, 23)
-    body += _text(224, 313, "One cell = one group, one month", anchor="middle", size=12)
-    return (body + _note(prefix, 1, 12, 49, ["Choose a group", "+ a month."], (94, 184))
-            + _note(prefix, 2, 230, 49, ["Green = up", "Red = down"], (226, 190))
-            + _note(prefix, 3, 80, 357, ["(+10% − 2%) ÷ 2", "= +4% group average"], (136, 214), width=228))
+    body += _text(224, 313, t("One cell = one group, one month"), anchor="middle", size=12)
+    return (body + _note(prefix, 1, 12, 49, [t("Choose a group"), t("+ a month.")], (94, 184))
+            + _note(prefix, 2, 230, 49, [t("Green = up"), t("Red = down")], (226, 190))
+            + _note(prefix, 3, 80, 357, [t("(+10% − 2%) ÷ 2"), t("= +4% group average")], (136, 214), width=228))
 
 
 def _bars(topic, prefix):
@@ -160,43 +164,43 @@ def _bars(topic, prefix):
     for i, value in enumerate(values):
         top, end = 158 + i * 46, zero + value * scale
         colour = RED if value < 0 else GREEN
-        body += _text(88, top + 20, f'Stock {chr(65+i)}', anchor="end", size=12)
+        body += _text(88, top + 20, t("Stock {letter}", letter=chr(65+i)), anchor="end", size=12)
         body += f'<rect x="{min(zero,end)}" y="{top}" width="{abs(value)*scale}" height="27" rx="3" fill="{colour}"/>'
         label = f'{value:g}M' if volume else f'{value:+g}%'
         body += _text(end + (8 if negative else 7), top + 19, label, size=13, colour="#fff" if negative else INK)
     body += _text(zero, 320, "0", anchor="middle", size=12)
-    body += _text(348, 340, "Shares traded (M = million)" if volume else "Price change (%)", anchor="end", size=12)
+    body += _text(348, 340, t("Shares traded (M = million)") if volume else t("Price change (%)"), anchor="end", size=12)
     if volume:
-        third, second = ["2M = 2m shares", "NOT $2m of money."], ["Longer = more", "shares traded." ]
+        third, second = [t("2M = 2m shares"), t("NOT $2m of money.")], [t("Longer = more"), t("shares traded.")]
     elif topic == "ranking":
-        third, second = ["$100 → $120", "means +20%."], ["Longer = bigger", "percentage change."]
+        third, second = [t("$100 → $120"), t("means +20%.")], [t("Longer = bigger"), t("percentage change.")]
     elif topic == "gainers":
-        third, second = ["$50 → $51", "means +2% today."], ["Compare daily", "percentage moves."]
+        third, second = [t("$50 → $51"), t("means +2% today.")], [t("Compare daily"), t("percentage moves.")]
     else:
-        third, second = ["$80 → $76", "means −5% today."], ["Left of zero", "= a price fall."]
-    return (body + _note(prefix, 1, 12, 49, ["Each row is", "one stock."], (86, 178))
+        third, second = [t("$80 → $76"), t("means −5% today.")], [t("Left of zero"), t("= a price fall.")]
+    return (body + _note(prefix, 1, 12, 49, [t("Each row is"), t("one stock.")], (86, 178))
             + _note(prefix, 2, 230, 49, second, (min(zero+values[0]*scale,350), 165))
             + _note(prefix, 3, 94, 357, third, (zero+values[1]*scale, 219)))
 
 
 def _comparison(prefix):
-    body = _axes(y_label="Starting level = 100")
+    body = _axes(y_label=t("Starting level = 100"))
     body += _line(65, 252, 382, 252, "#8190a3", dash="5 4")
     body += f'<polyline points="80,252 145,225 205,238 280,185 360,160" fill="none" stroke="{BLUE}" stroke-width="3"/>'
     body += f'<polyline points="80,252 145,267 205,247 280,275 360,298" fill="none" stroke="{PURPLE}" stroke-width="3"/>'
     body += _text(60, 256, "100", anchor="end", size=12)
     body += _text(365, 154, "120", colour=BLUE, weight=700)
     body += _text(365, 294, "90", colour=PURPLE, weight=700)
-    body += _text(251, 176, "Stock A", size=12, colour=BLUE)
-    body += _text(251, 296, "Stock B", size=12, colour=PURPLE)
+    body += _text(251, 176, t("Stock {letter}", letter="A"), size=12, colour=BLUE)
+    body += _text(251, 296, t("Stock {letter}", letter="B"), size=12, colour=PURPLE)
     body += _ring(80, 252, 12, 12)
-    return (body + _note(prefix, 1, 12, 49, ["Start together", "at 100."], (80, 246))
-            + _note(prefix, 2, 230, 49, ["120 means +20%", "since the start."], (360, 160))
-            + _note(prefix, 3, 94, 357, ["90 means −10%.", "Not a share price!"], (360, 298)))
+    return (body + _note(prefix, 1, 12, 49, [t("Start together"), t("at 100.")], (80, 246))
+            + _note(prefix, 2, 230, 49, [t("120 means +20%"), t("since the start.")], (360, 160))
+            + _note(prefix, 3, 94, 357, [t("90 means −10%."), t("Not a share price!")], (360, 298)))
 
 
 def _risk(prefix):
-    body = _axes(y_label="Past return (%)", x_label="Annualized volatility (%)", zero_y=302)
+    body = _axes(y_label=t("Past return (%)"), x_label=t("Annualized volatility (%)"), zero_y=302)
     body += _line(65, 281, 382, 281, "#8190a3", dash="5 4")
     for y, label in [(281, "0%"), (221, "+5%"), (161, "+10%")]:
         body += _text(59, y + 4, label, anchor="end", size=12)
@@ -206,14 +210,14 @@ def _risk(prefix):
         body += f'<circle cx="{x}" cy="{y}" r="9" fill="{colour}"/>'
         body += _text(x + 14, y + 4, label, weight=700)
     body += _ring(145, 161, 17, 16)
-    return (body + _note(prefix, 1, 12, 49, ["Up / down", "= past return."], (145, 161))
-            + _note(prefix, 2, 230, 49, ["Further right", "= bigger swings."], (330, 221))
-            + _note(prefix, 3, 80, 357, ["A: 20% volatility", "+10% past return"], (145, 180), width=228))
+    return (body + _note(prefix, 1, 12, 49, [t("Up / down"), t("= past return.")], (145, 161))
+            + _note(prefix, 2, 230, 49, [t("Further right"), t("= bigger swings.")], (330, 221))
+            + _note(prefix, 3, 80, 357, [t("A: 20% volatility"), t("+10% past return")], (145, 180), width=228))
 
 
 def annotated_example(topic: str) -> str:
     """Return an accessible drawing without scripts, external assets or live data."""
-    summary = EXAMPLE_SUMMARIES[topic]
+    summary = t(EXAMPLE_SUMMARIES[topic])
     prefix = f'lesson-{topic}'
     markers = ''.join(f'<marker id="{prefix}-arrow-{i}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 0 L 6 3.5 L 0 7" fill="none" stroke="{colour}" stroke-width="1.5"/></marker>' for i, colour in enumerate([BLUE, PURPLE, ORANGE], start=1))
     if topic in {"price_line", "price_area", "price_baseline"}:
@@ -228,11 +232,12 @@ def annotated_example(topic: str) -> str:
         marks = _comparison(prefix)
     else:
         marks = _risk(prefix)
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 446" width="100%" role="img" aria-labelledby="{prefix}-title {prefix}-desc" style="display:block;background:#fffdf6;border:1px solid #e6e0d0;border-radius:14px;font-family:Trebuchet MS,Arial,sans-serif">
-<title id="{prefix}-title">Annotated teaching example: {escape(topic.replace('_',' '))}</title>
-<desc id="{prefix}-desc">Fictional figures. {escape(summary)} Follow notes 1, 2 and 3 and their arrows.</desc>
+    font = "Microsoft JhengHei, PingFang HK, Trebuchet MS, Arial, sans-serif" if is_zh() else "Trebuchet MS, Arial, sans-serif"
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 446" width="100%" role="img" aria-labelledby="{prefix}-title {prefix}-desc" style="display:block;background:#fffdf6;border:1px solid #e6e0d0;border-radius:14px;font-family:{font}">
+<title id="{prefix}-title">{escape(t("Annotated teaching example: {topic}", topic=topic.replace("_", " ")))}</title>
+<desc id="{prefix}-desc">{escape(t("Fictional figures. {summary} Follow notes 1, 2 and 3 and their arrows.", summary=summary))}</desc>
 <defs>{markers}</defs>
-{_text(18, 28, 'A LITTLE CHART FIELD NOTE', size=12, colour=BLUE, weight=700)}
+{_text(18, 28, t("A LITTLE CHART FIELD NOTE"), size=12, colour=BLUE, weight=700)}
 {marks}
-{_text(220, 435, 'Made-up numbers · learn the picture, not a prediction', size=11, colour='#667084', anchor='middle')}
+{_text(220, 435, t("Made-up numbers · learn the picture, not a prediction"), size=11, colour="#667084", anchor="middle")}
 </svg>'''

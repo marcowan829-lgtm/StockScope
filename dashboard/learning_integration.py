@@ -3,6 +3,7 @@ from pathlib import Path
 import runpy
 
 import streamlit as st
+from i18n import is_zh, t
 
 
 COURSE_PAGES = [
@@ -36,7 +37,17 @@ def return_to_markets() -> None:
 
 @st.dialog("Your study path", position="right", width="small")
 def show_study_path() -> None:
+    dialog_title_css = ""
+    if is_zh():
+        dialog_title_css = (
+            '[data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] h2'
+            "{font-size:0!important;line-height:0;}"
+            '[data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] h2::after'
+            f'{{content:"{t("Your study path")}";font-size:1.45rem;line-height:1.3;'
+            "color:#131722;display:block;font-weight:700;letter-spacing:-0.02em;}"
+        )
     st.markdown('''<span class="study-path-marker"></span><style>
+      ''' + dialog_title_css + '''
       [data-testid="stDialog"]:has(.study-path-marker) {background:transparent!important;}
       [data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] { background:#fff; color:#131722; }
       [data-testid="stDialog"]:has(.study-path-marker) h2,
@@ -57,16 +68,16 @@ def show_study_path() -> None:
       .study-path-logo {display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:#fff;border:1px solid #e0e3eb;color:#131722;font-size:26px;font-weight:800;}
       .study-path-brand b {color:#131722;font-size:1.2rem;}
       .study-path-brand small {display:block;color:#6a6d78;margin-top:5px;}
-    </style><div class="study-path-brand"><span class="study-path-logo">S</span><div><b>StockScope Learn</b><small>Build your market knowledge, one lesson at a time.</small></div></div>''', unsafe_allow_html=True)
+    </style><div class="study-path-brand"><span class="study-path-logo">S</span><div><b>StockScope Learn</b><small>''' + t("Build your market knowledge, one lesson at a time.") + '''</small></div></div>''', unsafe_allow_html=True)
     completed = set(st.session_state.get("completed_lessons", []))
     done = sum(name in completed for _, name, _ in COURSE_PAGES[1:9])
-    st.progress(done / 8, text=f"{done} of 8 lessons completed")
+    st.progress(done / 8, text=t("{done} of 8 lessons completed", done=done))
     for index, (page, name, duration) in enumerate(COURSE_PAGES):
         mark = "✓" if name in completed else "○"
-        if st.button(f"{mark}  {page}", key=f"study_lesson_{index}", width="stretch", help=duration,
+        if st.button(f"{mark}  {t(page)}", key=f"study_lesson_{index}", width="stretch", help=t(duration),
                      on_click=open_lesson, args=(page,)):
             st.rerun()
-    st.caption("Your progress is saved in this browser session.")
+    st.caption(t("Your progress is saved in this browser session."))
 
 
 def render_study_launcher() -> None:
@@ -78,7 +89,7 @@ def render_study_launcher() -> None:
       .st-key-study_path_launcher button p {position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;}
     </style>''', unsafe_allow_html=True)
     with st.container(key="study_path_launcher"):
-        if st.button("Study path", icon=":material/menu_book:", key="open_study_path", help="Open your study path"):
+        if st.button(t("Study path"), icon=":material/menu_book:", key="open_study_path", help=t("Open your study path")):
             show_study_path()
 
 
@@ -88,5 +99,5 @@ def render_learning_page() -> None:
     # This also preserves it in sessions opened before that widget was removed.
     st.session_state.main_nav = st.session_state.get("main_nav", "Learning Home")
     with st.container(key="learning_content"):
-        st.button("Back to markets", key="back_to_markets", on_click=return_to_markets)
+        st.button(t("Back to markets"), key="back_to_markets", on_click=return_to_markets)
         runpy.run_path(str(Path(__file__).resolve().parents[1] / "learn" / "app.py"), run_name="__main__")

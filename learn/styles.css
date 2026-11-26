@@ -3,6 +3,7 @@
   --ink:#131722; --muted:#6a6d78; --panel:#fff; --panel-2:#fff;
   --line:#e0e3eb; --mint:#087f6d; --blue:#2962ff; --amber:#946200; --rose:#c63845;
   color:var(--ink); background:#fff; min-width:0;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang HK","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
 }
 @SCOPE@ h1, @SCOPE@ h2, @SCOPE@ h3, @SCOPE@ h4,
 @SCOPE@ p, @SCOPE@ li, @SCOPE@ label, @SCOPE@ [data-testid="stMarkdownContainer"] {

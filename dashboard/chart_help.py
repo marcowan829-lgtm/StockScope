@@ -4,6 +4,7 @@ import html
 import plotly.graph_objects as go
 import streamlit as st
 from chart_examples import EXAMPLE_SUMMARIES, annotated_example
+from i18n import is_zh, t
 from learning_integration import open_lesson
 
 
@@ -196,37 +197,51 @@ def _plain_markdown(text: str) -> str:
 
 @st.dialog("How to read this chart", position="right", width="small")
 def show_chart_guide(topic: str) -> None:
+    dialog_title_css = ""
+    if is_zh():
+        dialog_title_css = (
+            '[data-testid="stDialog"]:has(.chart-guide-marker) [role="dialog"] h2'
+            "{font-size:0!important;line-height:0;}"
+            '[data-testid="stDialog"]:has(.chart-guide-marker) [role="dialog"] h2::after'
+            f'{{content:"{t("How to read this chart")}";font-size:1.45rem;line-height:1.3;'
+            "color:#131722;display:block;font-weight:700;letter-spacing:-0.02em;}"
+        )
+    st.markdown(
+        f'<span class="chart-guide-marker"></span><style>{dialog_title_css}</style>',
+        unsafe_allow_html=True,
+    )
     guide = CHART_GUIDES[topic]
-    st.subheader(guide["title"])
-    st.caption("MADE-UP EXAMPLE · Follow the drawing notes: 1 → 2 → 3.")
-    st.image(annotated_example(topic), width="stretch", alt=f"Annotated example. {EXAMPLE_SUMMARIES[topic]} Follow the three numbered drawing notes.")
-    st.info(EXAMPLE_SUMMARIES[topic])
-    with st.expander("Read more · step-by-step explanation", expanded=False):
-        st.markdown("#### What am I looking at?")
-        st.markdown(_plain_markdown(guide["what"]))
-        st.markdown("#### How to read it")
+    st.subheader(t(guide["title"]))
+    st.caption(t("MADE-UP EXAMPLE · Follow the drawing notes: 1 → 2 → 3."))
+    summary = t(EXAMPLE_SUMMARIES[topic])
+    st.image(annotated_example(topic), width="stretch", alt=t("Annotated example. {summary} Follow the three numbered drawing notes.", summary=summary))
+    st.info(summary)
+    with st.expander(t("Read more · step-by-step explanation"), expanded=False):
+        st.markdown(f"#### {t('What am I looking at?')}")
+        st.markdown(_plain_markdown(t(guide["what"])))
+        st.markdown(f"#### {t('How to read it')}")
         for number, step in enumerate(guide["steps"], start=1):
-            st.markdown(_plain_markdown(f"**{number}.** {step}"))
+            st.markdown(_plain_markdown(f"**{number}.** {t(step)}"))
         if topic in {"price_line", "price_area", "price_baseline"}:
-            st.markdown("**Bars underneath:** when volume is available, these count shares traded in each time block. Taller means more shares traded. Green/red compares that block's close with its open, rather than the whole line's reference. Index volume can be missing or zero.")
-        st.markdown("#### A simple example")
-        st.info(_plain_markdown(guide["example"]))
-        st.markdown("#### What can I learn?")
-        st.markdown(_plain_markdown(guide["learn"]))
-        st.markdown("#### Keep in mind")
-        st.markdown(_plain_markdown(guide["note"]))
+            st.markdown(t("**Bars underneath:** when volume is available, these count shares traded in each time block. Taller means more shares traded. Green/red compares that block's close with its open, rather than the whole line's reference. Index volume can be missing or zero."))
+        st.markdown(f"#### {t('A simple example')}")
+        st.info(_plain_markdown(t(guide["example"])))
+        st.markdown(f"#### {t('What can I learn?')}")
+        st.markdown(_plain_markdown(t(guide["learn"])))
+        st.markdown(f"#### {t('Keep in mind')}")
+        st.markdown(_plain_markdown(t(guide["note"])))
     lesson, description = RELATED_LESSONS[topic]
     st.divider()
-    st.markdown("**Want to learn more?**")
-    st.caption(description)
-    if st.button(f"Lesson {lesson} →", key=f"chart_lesson_{topic}", width="stretch",
-                 help=f"Open Lesson {lesson}", on_click=open_lesson, args=(lesson,)):
+    st.markdown(f"**{t('Want to learn more?')}**")
+    st.caption(t(description))
+    if st.button(t("Lesson {lesson} →", lesson=t(lesson)), key=f"chart_lesson_{topic}", width="stretch",
+                 help=t("Open Lesson {lesson}", lesson=t(lesson)), on_click=open_lesson, args=(lesson,)):
         st.rerun()
-    st.caption("Close with ×, press Esc, or click outside the panel to return to your chart.")
+    st.caption(t("Close with ×, press Esc, or click outside the panel to return to your chart."))
 
 
 def chart_help_button(topic: str, key: str) -> None:
-    if st.button("?", key=f"chart_help_{key}", help=f"How to read: {CHART_GUIDES[topic]['title']}"):
+    if st.button("?", key=f"chart_help_{key}", help=t("How to read: {title}", title=t(CHART_GUIDES[topic]["title"]))):
         show_chart_guide(topic)
 
 
@@ -234,7 +249,7 @@ def help_chart(fig: go.Figure, topic: str, key: str, **chart_options):
     """Place a guide beside a chart heading without covering the plotted data."""
     title, question = st.columns([0.92, 0.08], gap="small", vertical_alignment="center")
     with title:
-        heading = fig.layout.title.text or CHART_GUIDES[topic]["title"]
+        heading = fig.layout.title.text or t(CHART_GUIDES[topic]["title"])
         st.markdown(f'<p class="chart-help-title">{html.escape(heading)}</p>', unsafe_allow_html=True)
     with question:
         chart_help_button(topic, key)

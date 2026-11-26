@@ -91,6 +91,23 @@ def test_market_tools_are_reachable_from_top_navigation():
     assert app.session_state["nav"] == "Home"
 
 
+def test_language_toggle_switches_to_hong_kong_traditional_chinese():
+    app = AppTest.from_file(str(ROOT / "dashboard/app.py"), default_timeout=30).run()
+    assert_clean(app)
+    assert app.pills(key="lang_pills").options == ["EN", "繁"]
+    assert app.pills(key="nav_pills").options == [
+        "Home", "Market Overview", "Screener", "Live Quotes", "Returns & Risk", "Stock Research",
+    ]
+    app.pills(key="lang_pills").set_value("繁").run()
+    assert_clean(app)
+    assert app.session_state["lang"] == "zh-HK"
+    assert app.session_state["nav"] == "Home"
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "自選" in markdown
+    assert "股市入門" in markdown
+    assert "選股器" in app.pills(key="nav_pills").options
+
+
 @pytest.mark.parametrize("tab,page", [
     ("Overview", "Market Overview"), ("Screener", "Screener"),
     ("Live quotes", "Live Quotes"), ("Returns & risk", "Returns & Risk"), ("Stock", "Stock Research"),

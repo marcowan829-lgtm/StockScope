@@ -12,12 +12,13 @@ import streamlit as st
 import yfinance as yf
 from plotly.subplots import make_subplots
 from chart_help import chart_help_button, help_chart
+from i18n import ZH, init_language, is_zh, lang_key, language_css, peek_lang, plotly_font, render_language_toggle, t
 from learning_integration import render_learning_page, render_study_launcher
 from watchlist_design import WATCHLIST_STYLE, quote_labels, watchlist_row_html
 
 
 st.set_page_config(
-    page_title="StockScope · Stock market for beginner",
+    page_title=t("StockScope · Stock market for beginner") if peek_lang() == "zh-HK" else "StockScope · Stock market for beginner",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -158,7 +159,7 @@ APP_STYLE = """
   html, body, [data-testid="stAppViewContainer"], .stApp {
     background: #ffffff;
     color: #131722;
-    font-family: -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang HK", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Trebuchet MS", Roboto, Ubuntu, sans-serif;
   }
   [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
   header[data-testid="stHeader"] { display: none !important; }
@@ -325,8 +326,8 @@ def display_symbol(ticker: str) -> str:
 
 def company_name(ticker: str) -> str:
     if ticker in INDEX_META:
-        return INDEX_META[ticker]["name"]
-    return COMPANY_NAMES.get(ticker, ticker)
+        return t(INDEX_META[ticker]["name"])
+    return t(COMPANY_NAMES.get(ticker, ticker))
 
 
 def is_index(ticker: str) -> bool:
@@ -384,15 +385,15 @@ def to_new_york_time(value) -> pd.Timestamp:
 
 def estimated_us_session(now_et: pd.Timestamp) -> str:
     if now_et.weekday() >= 5:
-        return "Weekend: the regular US session is usually closed"
+        return t("Weekend: the regular US session is usually closed")
     current_minutes = now_et.hour * 60 + now_et.minute
     if 4 * 60 <= current_minutes < 9 * 60 + 30:
-        return "Pre-market (clock estimate)"
+        return t("Pre-market (clock estimate)")
     if 9 * 60 + 30 <= current_minutes < 16 * 60:
-        return "Regular session (clock estimate)"
+        return t("Regular session (clock estimate)")
     if 16 * 60 <= current_minutes < 20 * 60:
-        return "After hours (clock estimate)"
-    return "Outside the regular session"
+        return t("After hours (clock estimate)")
+    return t("Outside the regular session")
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -558,8 +559,8 @@ def calculate_metrics(prices: pd.DataFrame) -> pd.DataFrame:
         drawdown = (close / close.cummax() - 1).min() * 100
         rows.append({
             "Ticker": ticker,
-            "Group": UNIVERSE.get(ticker, "Other"),
-            "Company": company_name(str(ticker)),
+        "Group": UNIVERSE.get(ticker, "Other"),
+        "Company": company_name(str(ticker)),
             "Last": last_price,
             "Period return (%)": total_return,
             "Ann. volatility (%)": volatility,
@@ -583,7 +584,7 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
     if monthly_returns.empty:
         return None
     monthly_returns = monthly_returns.iloc[:, 1:]
-    monthly_returns["Group"] = [UNIVERSE.get(t, "Other") for t in monthly_returns.index]
+    monthly_returns["Group"] = [UNIVERSE.get(sym, "Other") for sym in monthly_returns.index]
     sect = monthly_returns.groupby("Group").mean(numeric_only=True)
     if sect.empty or sect.shape[1] == 0:
         return None
@@ -591,16 +592,16 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
     fig = go.Figure(data=go.Heatmap(
         z=sect.values,
         x=labels,
-        y=sect.index.tolist(),
+        y=[t(g) for g in sect.index.tolist()],
         colorscale="RdYlGn",
         zmid=0,
-        colorbar={"title": "Monthly %"},
-        hovertemplate="Group: %{y}<br>Month: %{x}<br>Avg return: %{z:.2f}%<extra></extra>",
+        colorbar={"title": t("Monthly %")},
+        hovertemplate=t("Group: %{y}<br>Month: %{x}<br>Avg return: %{z:.2f}%<extra></extra>"),
     ))
     fig.update_layout(
-        title="Group monthly returns (0% = unchanged · equal-weighted inside each group)",
-        xaxis_title="Month",
-        yaxis_title="Group",
+        title=t("Group monthly returns (0% = unchanged · equal-weighted inside each group)"),
+        xaxis_title=t("Month"),
+        yaxis_title=t("Group"),
         height=420,
         margin=dict(l=10, r=10, t=60, b=10),
         paper_bgcolor="#ffffff",
@@ -694,7 +695,7 @@ def apply_market_layout(
         plot_bgcolor="#ffffff",
         hovermode="x unified",
         showlegend=False,
-        font=dict(color="#131722", size=12, family="Trebuchet MS, Segoe UI, sans-serif"),
+        font=dict(color="#131722", size=12, family=plotly_font()),
         xaxis_rangeslider_visible=False,
         spikedistance=-1,
     )
@@ -799,7 +800,7 @@ def build_price_chart(
             line=dict(color=line_color, width=1.6, shape="linear"),
             fill="tozeroy",
             fillcolor=AREA_FILL_UP if up else AREA_FILL_DOWN,
-            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+            hovertemplate=t("Close: %{y:,.2f}<extra></extra>"),
         ), row=1, col=1)
     elif kind == "Baseline":
         baseline = float(ref)
@@ -833,13 +834,13 @@ def build_price_chart(
             x=x_hi, y=y_hi, mode="lines", name=name,
             line=dict(color=UP_COLOR, width=1.6, shape="linear"),
             connectgaps=False,
-            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+            hovertemplate=t("Close: %{y:,.2f}<extra></extra>"),
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
             x=x_lo, y=y_lo, mode="lines", name=name,
             line=dict(color=DOWN_COLOR, width=1.6, shape="linear"),
             connectgaps=False,
-            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+            hovertemplate=t("Close: %{y:,.2f}<extra></extra>"),
         ), row=1, col=1)
         fig.add_hline(y=baseline, line_color=PREV_CLOSE_COLOR, line_width=1, row=1, col=1)
     else:
@@ -849,18 +850,18 @@ def build_price_chart(
             mode="lines",
             name=name,
             line=dict(color=line_color, width=1.6, shape="linear"),
-            hovertemplate="Close: %{y:,.2f}<extra></extra>",
+            hovertemplate=t("Close: %{y:,.2f}<extra></extra>"),
         ), row=1, col=1)
 
     if has_volume:
         fig.add_trace(go.Bar(
             x=x,
             y=frame["Volume"],
-            name="Volume",
+            name=t("Volume"),
             marker_color=volume_bar_colors(frame),
             marker_line_width=0,
             opacity=0.9,
-            hovertemplate="Volume: %{y:,.0f}<extra></extra>",
+            hovertemplate=t("Volume: %{y:,.0f}<extra></extra>"),
         ), row=2, col=1)
 
     ymin = float(close.min())
@@ -903,6 +904,10 @@ def build_price_chart(
     if range_key == "1D":
         fig.update_xaxes(dtick=3_600_000)
     return fig
+
+
+def period_label(period: str) -> str:
+    return t(PERIOD_LABELS[period])
 
 
 def signed_hbar(df: pd.DataFrame, x_col: str, y_col: str, title: str, x_title: str) -> go.Figure:
@@ -1037,12 +1042,12 @@ def session_bar_stats(frame: pd.DataFrame) -> dict:
 
 def add_to_watchlist(ticker: str) -> str:
     if ticker in INDEX_META:
-        return f"{display_symbol(ticker)} already sits in Indices."
+        return t("{ticker} already sits in Indices.", ticker=display_symbol(ticker))
     current = list(st.session_state.get("watchlist", []))
     if ticker in current:
-        return f"{ticker} is already on your watchlist."
+        return t("{ticker} is already on your watchlist.", ticker=ticker)
     st.session_state.watchlist = current + [ticker]
-    return f"Added {ticker} to Watchlist."
+    return t("Added {ticker} to Watchlist.", ticker=ticker)
 
 
 def remove_from_watchlist(ticker: str) -> None:
@@ -1056,7 +1061,7 @@ def normalize_query(query: str) -> str:
 def resolve_search(query: str) -> dict:
     q = query.strip()
     if not q:
-        return {"error": "Type a ticker or company name, for example AAPL or Apple."}
+        return {"error": t("Type a ticker or company name, for example AAPL or Apple.")}
     compact = normalize_query(q)
     if compact in INDEX_ALIASES:
         return {"ticker": INDEX_ALIASES[compact]}
@@ -1064,16 +1069,24 @@ def resolve_search(query: str) -> dict:
     if upper in UNIVERSE:
         return {"ticker": upper}
     lower = q.casefold()
-    exact_name = next((t for t, name in COMPANY_NAMES.items() if name.casefold() == lower), None)
+    exact_name = next(
+        (symbol for symbol, name in COMPANY_NAMES.items()
+         if name.casefold() == lower or ZH.get(name, "").casefold() == lower),
+        None,
+    )
     if exact_name:
         return {"ticker": exact_name}
     matches = [
-        t for t in UNIVERSE
-        if upper in t.upper() or lower in COMPANY_NAMES.get(t, t).casefold()
+        symbol for symbol in UNIVERSE
+        if upper in symbol.upper()
+        or lower in COMPANY_NAMES.get(symbol, symbol).casefold()
+        or lower in ZH.get(COMPANY_NAMES.get(symbol, symbol), "").casefold()
     ]
     index_matches = [
         yahoo for yahoo, meta in INDEX_META.items()
-        if lower in meta["name"].casefold() or lower in meta["display"].casefold()
+        if lower in meta["name"].casefold()
+        or lower in meta["display"].casefold()
+        or lower in ZH.get(meta["name"], "").casefold()
     ]
     matches = list(dict.fromkeys(index_matches + matches))
     if len(matches) == 1:
@@ -1082,7 +1095,7 @@ def resolve_search(query: str) -> dict:
         return {"candidates": matches}
     if re.fullmatch(r"[A-Za-z][A-Za-z0-9.-]{0,9}", q):
         return {"ticker": upper, "custom": True}
-    return {"error": "No match in the starter list. Try a US ticker such as AAPL, MSFT, or SPX."}
+    return {"error": t("No match in the starter list. Try a US ticker such as AAPL, MSFT, or SPX.")}
 
 
 def on_search_change() -> None:
@@ -1126,6 +1139,7 @@ def remember_idx_chart_type() -> None:
 
 
 def init_state() -> None:
+    init_language()
     st.session_state.setdefault("nav", "Home")
     # Migrate open sessions from the old nested Markets navigation.
     previous_nav = st.session_state.nav
@@ -1161,13 +1175,16 @@ def init_state() -> None:
 
 
 def render_top_nav() -> None:
-    brand, navigation, search = st.columns([1.05, 5.85, 1.8], gap="medium", vertical_alignment="center")
+    brand, navigation, tools = st.columns([0.95, 5.05, 2.4], gap="small", vertical_alignment="center")
     with brand:
         st.markdown('<div class="topnav"><div class="brand">StockScope</div></div>', unsafe_allow_html=True)
     with navigation:
         if "nav_pills" not in st.session_state:
             st.session_state.nav_pills = st.session_state.nav if st.session_state.nav in TOP_NAV else None
-        picked = st.pills("Section", TOP_NAV, key="nav_pills", label_visibility="collapsed")
+        picked = st.pills(
+            "Section", TOP_NAV, key="nav_pills", label_visibility="collapsed",
+            format_func=lambda page: t(page),
+        )
         last_pill = st.session_state.get("_last_nav_pill")
         if picked and picked != last_pill:
             st.session_state.nav = picked
@@ -1175,15 +1192,19 @@ def render_top_nav() -> None:
             st.session_state._last_nav_pill = picked
         elif picked and st.session_state.get("nav") in TOP_NAV:
             st.session_state._last_nav_pill = picked
-    with search:
-        st.text_input(
-            "Search",
-            placeholder="Search stocks or indices",
-            label_visibility="collapsed",
-            key="nav_search",
-            on_change=on_search_change,
-            help="Search a ticker or company in the starter list, or a main US index such as SPX.",
-        )
+    with tools:
+        search, lang = st.columns([1.7, 0.7], vertical_alignment="center")
+        with search:
+            st.text_input(
+                t("Search"),
+                placeholder=t("Search stocks or indices"),
+                label_visibility="collapsed",
+                key="nav_search",
+                on_change=on_search_change,
+                help=t("Search a ticker or company in the starter list, or a main US index such as SPX."),
+            )
+        with lang:
+            render_language_toggle()
     st.markdown('<hr class="nav-rule" />', unsafe_allow_html=True)
 
     result = st.session_state.get("search_result") or {}
@@ -1192,12 +1213,12 @@ def render_top_nav() -> None:
     elif result.get("candidates"):
         pick_col, go_col = st.columns([4, 1])
         chosen = pick_col.selectbox(
-            "Matches",
+            t("Matches"),
             options=result["candidates"],
             format_func=ticker_label,
-            key="search_candidate_choice",
+            key=lang_key("search_candidate_choice"),
         )
-        if go_col.button("Open", width="stretch"):
+        if go_col.button(t("Open"), width="stretch"):
             st.session_state.selected_symbol = chosen
             st.session_state.search_result = {"ticker": chosen}
             if chosen in INDEX_META:
@@ -1216,8 +1237,8 @@ def index_card_title_html(ticker: str) -> str:
         '<div class="idx-head-main">'
         f'<div class="idx-badge" style="background:{meta["badge_bg"]}">{html.escape(meta["badge"])}</div>'
         "<div>"
-        f'<div class="idx-name">{html.escape(meta["name"])}<span class="idx-ticker">{html.escape(meta["display"])}</span></div>'
-        f'<div class="idx-blurb">{html.escape(meta["blurb"])}</div>'
+        f'<div class="idx-name">{html.escape(t(meta["name"]))}<span class="idx-ticker">{html.escape(meta["display"])}</span></div>'
+        f'<div class="idx-blurb">{html.escape(t(meta["blurb"]))}</div>'
         "</div></div>"
     )
 
@@ -1226,9 +1247,10 @@ def index_card_quote_html(ticker: str, snap_row: dict) -> str:
     last = snap_row.get("last", np.nan)
     chg_pct = snap_row.get("chg_pct", np.nan)
     last_text = "—" if pd.isna(last) else f"{last:,.2f}"
+    unit = t(INDEX_META[ticker]["unit"]) if INDEX_META[ticker]["unit"] == "point" else INDEX_META[ticker]["unit"]
     return (
         '<div class="idx-quote">'
-        f'<div class="last-px">{last_text}<span class="last-unit">{html.escape(INDEX_META[ticker]["unit"])}</span></div>'
+        f'<div class="last-px">{last_text}<span class="last-unit">{html.escape(unit)}</span></div>'
         f'<div class="{chg_class(chg_pct)}">{html.escape(format_chg(chg_pct, True))}</div>'
         "</div>"
     )
@@ -1244,11 +1266,11 @@ def render_index_cards(snap: pd.DataFrame) -> None:
                 with info:
                     st.markdown(index_card_title_html(ticker), unsafe_allow_html=True)
                 with plus_col:
-                    if st.button("＋", key=widget_key("idx_add", ticker), help=f"Add {meta['proxy']} (tracks this index) to Watchlist"):
+                    if st.button("＋", key=widget_key("idx_add", ticker), help=t("Add {proxy} (tracks this index) to Watchlist", proxy=meta["proxy"])):
                         st.session_state.flash = add_to_watchlist(meta["proxy"])
                         st.rerun()
                 with open_col:
-                    if st.button("↗", key=widget_key("idx_open", ticker), help=f"Open {meta['name']} page"):
+                    if st.button("↗", key=widget_key("idx_open", ticker), help=t("Open {name} page", name=t(meta["name"]))):
                         open_index_page(ticker)
                         st.rerun()
                 st.markdown(index_card_quote_html(ticker, lookup_snapshot(snap, ticker)), unsafe_allow_html=True)
@@ -1307,9 +1329,12 @@ def render_watchlist_rows(tickers: Iterable[str], snap: pd.DataFrame) -> None:
         meta = INDEX_META.get(ticker, {})
         selected = ticker == st.session_state.selected_symbol
         last, change, _ = quote_labels(quote.get("last"), quote.get("chg"), quote.get("chg_pct"), is_index=bool(meta))
-        label = f"Show {company_name(ticker)} ({display_symbol(ticker)}) on chart. Price {last}; daily change {change}."
+        label = t(
+            "Show {name} ({symbol}) on chart. Price {last}; daily change {change}.",
+            name=company_name(ticker), symbol=display_symbol(ticker), last=last, change=change,
+        )
         if selected:
-            label += " Selected."
+            label += t(" Selected.")
         with st.container(key=widget_key("wlrow", ticker)):
             st.markdown(watchlist_row_html(
                 ticker, company_name(ticker), display_symbol(ticker),
@@ -1318,7 +1343,7 @@ def render_watchlist_rows(tickers: Iterable[str], snap: pd.DataFrame) -> None:
             ), unsafe_allow_html=True)
             st.button(label, key=widget_key("wl_pick", ticker), width="stretch",
                       on_click=select_watchlist_symbol, args=(ticker,),
-                      help="Currently shown on the chart" if selected else f"Show {display_symbol(ticker)} on the chart")
+                      help=t("Currently shown on the chart") if selected else t("Show {symbol} on the chart", symbol=display_symbol(ticker)))
 
 
 def render_watchlist_panel(snap: pd.DataFrame, *, show_remove: bool = False) -> None:
@@ -1328,56 +1353,62 @@ def render_watchlist_panel(snap: pd.DataFrame, *, show_remove: bool = False) -> 
         with st.container(key="watchlist_header"):
             head_l, head_r = st.columns([3, 1], vertical_alignment="center")
             with head_l:
-                st.markdown(f'<p class="watchlist-heading">Watchlist</p><p class="watchlist-summary">{len(INDEX_ORDER)} indices · {len(stocks)} stocks & funds</p>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<p class="watchlist-heading">{t("Watchlist")}</p>'
+                    f'<p class="watchlist-summary">{t("{n_idx} indices · {n_stocks} stocks & funds", n_idx=len(INDEX_ORDER), n_stocks=len(stocks))}</p>',
+                    unsafe_allow_html=True,
+                )
             with head_r:
-                with st.popover("＋", help="Add a company or fund to your watchlist"):
-                    add_query = st.text_input("Add ticker", placeholder="Name or ticker, e.g. NVDA", key="wl_add_query")
-                    if st.button("Add symbol", key="wl_add_btn", width="stretch"):
+                with st.popover("＋", help=t("Add a company or fund to your watchlist")):
+                    add_query = st.text_input(t("Add ticker"), placeholder=t("Name or ticker, e.g. NVDA"), key="wl_add_query")
+                    if st.button(t("Add symbol"), key="wl_add_btn", width="stretch"):
                         resolved = resolve_search(add_query)
-                        st.session_state.flash = add_to_watchlist(resolved["ticker"]) if resolved.get("ticker") else resolved.get("error", "Could not add that symbol.")
+                        st.session_state.flash = add_to_watchlist(resolved["ticker"]) if resolved.get("ticker") else resolved.get("error", t("Could not add that symbol."))
                         st.rerun()
 
-        st.markdown(f'<div class="watchlist-group-title">Market indices<span class="watchlist-count">{len(INDEX_ORDER)}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="watchlist-group-title">{t("Market indices")}<span class="watchlist-count">{len(INDEX_ORDER)}</span></div>', unsafe_allow_html=True)
         render_watchlist_rows(INDEX_ORDER, snap)
-        st.markdown(f'<div class="watchlist-group-title">Stocks & funds<span class="watchlist-count">{len(stocks)}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="watchlist-group-title">{t("Stocks & funds")}<span class="watchlist-count">{len(stocks)}</span></div>', unsafe_allow_html=True)
         if stocks:
             render_watchlist_rows(stocks, snap)
             if show_remove:
-                with st.popover("Manage watchlist", width="stretch"):
-                    drop = st.selectbox("Remove", options=["—"] + stocks, format_func=lambda ticker: ticker_label(ticker) if ticker != "—" else "—", key="wl_remove_choice")
-                    if st.button("Remove from watchlist", key="wl_remove_btn", width="stretch", disabled=drop == "—"):
+                with st.popover(t("Manage watchlist"), width="stretch"):
+                    drop = st.selectbox(t("Remove"), options=["—"] + stocks, format_func=lambda ticker: ticker_label(ticker) if ticker != "—" else "—", key=lang_key("wl_remove_choice"))
+                    if st.button(t("Remove from watchlist"), key="wl_remove_btn", width="stretch", disabled=drop == "—"):
                         remove_from_watchlist(drop)
                         st.rerun()
         else:
-            st.caption("Your list starts here. Use ＋ to add a company or fund.")
-        st.caption("Select a row to update the chart. Yahoo Finance quotes may be delayed.")
+            st.caption(t("Your list starts here. Use ＋ to add a company or fund."))
+        st.caption(t("Select a row to update the chart. Yahoo Finance quotes may be delayed."))
 
 
 def _index_chart_figure(ticker: str, snap: pd.DataFrame, *, tall: bool = False) -> tuple[go.Figure | None, pd.DataFrame]:
     bind_widget("idx_chart_range", "idx_chart_range_persist", "1D")
     bind_widget("idx_chart_type", "idx_chart_type_persist", "Candle")
     st.segmented_control(
-        "Chart type",
+        t("Chart type"),
         options=CHART_TYPES,
         key="idx_chart_type",
         on_change=remember_idx_chart_type,
+        format_func=lambda kind: t(kind),
     )
     st.pills(
-        "Range",
+        t("Range"),
         list(CHART_RANGES.keys()),
         key="idx_chart_range",
         on_change=remember_idx_chart_range,
         label_visibility="collapsed",
+        format_func=lambda rng: t(rng),
     )
     range_key = st.session_state.get("idx_chart_range") or "1D"
     if range_key not in CHART_RANGES:
         range_key = "1D"
     chart_type = st.session_state.get("idx_chart_type") or "Candle"
     spec = CHART_RANGES[range_key]
-    with st.spinner("Loading index chart…"):
+    with st.spinner(t("Loading index chart…")):
         series = download_ohlc(ticker, spec["period"], spec["interval"])
     if series.empty:
-        st.info("No bars for this range yet. Markets may be closed, or Yahoo did not return data.")
+        st.info(t("No bars for this range yet. Markets may be closed, or Yahoo did not return data."))
         return None, series
     quote = lookup_snapshot(snap, ticker)
     prev_close = None
@@ -1400,7 +1431,7 @@ def render_index_page() -> None:
     proxy = meta["proxy"]
 
     needed = tuple(dict.fromkeys([*INDEX_ORDER, proxy, *meta["related"]]))
-    with st.spinner("Loading index quotes…"):
+    with st.spinner(t("Loading index quotes…")):
         try:
             snap_prices = download_prices(needed, "5d")
             history = download_prices((ticker,), "5y")
@@ -1414,30 +1445,31 @@ def render_index_page() -> None:
         top_l, top_r = st.columns([3.4, 1])
         with top_l:
             st.markdown(
-                f'<p class="quote-name">{html.escape(meta["name"])}'
+                f'<p class="quote-name">{html.escape(t(meta["name"]))}'
                 f'<span class="quote-ticker">{html.escape(meta["display"])}</span></p>',
                 unsafe_allow_html=True,
             )
         with top_r:
-            if st.button("Exit full chart", key="idx_exit_full", width="stretch"):
+            if st.button(t("Exit full chart"), key="idx_exit_full", width="stretch"):
                 st.session_state.index_full_chart = False
                 st.rerun()
         last = quote.get("last", np.nan)
         chg = quote.get("chg", np.nan)
         chg_pct = quote.get("chg_pct", np.nan)
+        unit_text = t(meta["unit"]) if meta["unit"] in ("point", "USD") else meta["unit"].upper()
         st.markdown(
             f'<div class="quote-last">{html.escape(format_last(ticker, last))} '
-            f'<span class="last-unit">{html.escape(meta["unit"].upper())}</span> '
+            f'<span class="last-unit">{html.escape(unit_text)}</span> '
             f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
             unsafe_allow_html=True,
         )
         _index_chart_figure(ticker, snap, tall=True)
-        st.caption("Full chart uses the same data as the index page. Weekends and closed hours stay hidden. Yahoo Finance; may be delayed.")
+        st.caption(t("Full chart uses the same data as the index page. Weekends and closed hours stay hidden. Yahoo Finance; may be delayed."))
         return
 
     nav_l, nav_mid, nav_r = st.columns([1.35, 2.5, 2.3])
     with nav_l:
-        if st.button("Back to home", key="idx_back"):
+        if st.button(t("Back to home"), key="idx_back"):
             go_to("Home")
             st.rerun()
     with nav_mid:
@@ -1454,45 +1486,46 @@ def render_index_page() -> None:
     with nav_r:
         add_c, full_c = st.columns(2)
         with add_c:
-            if st.button(f"＋ {proxy}", key="idx_add_proxy", help=f"Add {proxy} to Watchlist", width="stretch"):
+            if st.button(f"＋ {proxy}", key="idx_add_proxy", help=t("Add {proxy} to Watchlist", proxy=proxy), width="stretch"):
                 st.session_state.flash = add_to_watchlist(proxy)
                 st.rerun()
         with full_c:
-            if st.button("Full chart", key="idx_full_chart", type="primary", width="stretch"):
+            if st.button(t("Full chart"), key="idx_full_chart", type="primary", width="stretch"):
                 st.session_state.index_full_chart = True
                 st.rerun()
 
     st.markdown(
-        f'<p class="quote-name">{html.escape(meta["name"])}'
+        f'<p class="quote-name">{html.escape(t(meta["name"]))}'
         f'<span class="quote-ticker">{html.escape(meta["display"])}</span></p>'
-        f'<p class="hero-sub">{html.escape(meta["members"])} · {html.escape(meta["blurb"])}</p>',
+        f'<p class="hero-sub">{html.escape(t(meta["members"]))} · {html.escape(t(meta["blurb"]))}</p>',
         unsafe_allow_html=True,
     )
     last = quote.get("last", np.nan)
     chg = quote.get("chg", np.nan)
     chg_pct = quote.get("chg_pct", np.nan)
+    unit_text = t(meta["unit"]) if meta["unit"] in ("point", "USD") else meta["unit"].upper()
     st.markdown(
         f'<div class="quote-last">{html.escape(format_last(ticker, last))} '
-        f'<span class="last-unit">{html.escape(meta["unit"].upper())}</span> '
+        f'<span class="last-unit">{html.escape(unit_text)}</span> '
         f'<span class="{chg_class(chg_pct)}">{html.escape(format_chg(chg))} {html.escape(format_chg(chg_pct, True))}</span></div>',
         unsafe_allow_html=True,
     )
     now_et = pd.Timestamp.now(tz="America/New_York")
-    st.caption(f"{estimated_us_session(now_et)} · quotes via Yahoo Finance, may be delayed.")
+    st.caption(t("{session} · quotes via Yahoo Finance, may be delayed.", session=estimated_us_session(now_et)))
 
     _, series = _index_chart_figure(ticker, snap, tall=False)
-    st.caption("Same four chart types as Home. Closed-market hours are hidden so the line stays continuous.")
+    st.caption(t("Same four chart types as Home. Closed-market hours are hidden so the line stays continuous."))
 
     stats = session_bar_stats(series) if series is not None else {}
     if stats:
         range_key = st.session_state.get("idx_chart_range") or "1D"
-        window = "Session" if range_key == "1D" else "Range"
+        window = t("Session open") if range_key == "1D" else t("Range open")
         chips = st.columns(4)
         labels = [
-            (f"{window} open", stats.get("open")),
-            (f"{window} high", stats.get("high")),
-            (f"{window} low", stats.get("low")),
-            ("Prev close", float(quote["last"]) - float(quote["chg"]) if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")) else np.nan),
+            (window if range_key == "1D" else t("Range open"), stats.get("open")),
+            (t("Session high") if range_key == "1D" else t("Range high"), stats.get("high")),
+            (t("Session low") if range_key == "1D" else t("Range low"), stats.get("low")),
+            (t("Prev close"), float(quote["last"]) - float(quote["chg"]) if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")) else np.nan),
         ]
         for col, (label, value) in zip(chips, labels):
             shown = "—" if value is None or pd.isna(value) else f"{value:,.2f}"
@@ -1500,11 +1533,11 @@ def render_index_page() -> None:
 
     left, right = st.columns([1.15, 1], gap="large")
     with left:
-        st.markdown("##### What this index is")
-        st.markdown(f'<div class="about-box"><p>{html.escape(meta["about"])}</p></div>', unsafe_allow_html=True)
+        st.markdown(f"##### {t('What this index is')}")
+        st.markdown(f'<div class="about-box"><p>{html.escape(t(meta["about"]))}</p></div>', unsafe_allow_html=True)
 
-        st.markdown("##### How it has moved")
-        horizons = [("1 month", 30), ("6 months", 182), ("1 year", 365), ("5 years", 365 * 5)]
+        st.markdown(f"##### {t('How it has moved')}")
+        horizons = [(t("1 month"), 30), (t("6 months"), 182), (t("1 year"), 365), (t("5 years"), 365 * 5)]
         mcols = st.columns(4)
         for col, (label, days) in zip(mcols, horizons):
             value = trailing_return(history, ticker, days) if not history.empty else np.nan
@@ -1518,23 +1551,25 @@ def render_index_page() -> None:
                 last_px = float(g["close"].iloc[-1])
                 span = hi - lo
                 pct_pos = 0 if span <= 0 else max(0, min(100, (last_px - lo) / span * 100))
-                st.markdown("##### 5-year range")
+                st.markdown(f"##### {t('5-year range')}")
                 st.markdown(
                     f'<div class="range-track"><div class="range-dot" style="left:{pct_pos:.1f}%"></div></div>'
                     f'<div style="display:flex;justify-content:space-between;color:#6a6d78;font-size:0.82rem">'
-                    f"<span>Low {lo:,.2f}</span><span>Last {last_px:,.2f}</span><span>High {hi:,.2f}</span></div>",
+                    f"<span>{t('Low {lo}', lo=f'{lo:,.2f}')}</span>"
+                    f"<span>{t('Last {last}', last=f'{last_px:,.2f}')}</span>"
+                    f"<span>{t('High {hi}', hi=f'{hi:,.2f}')}</span></div>",
                     unsafe_allow_html=True,
                 )
 
     with right:
-        st.markdown("##### The other US indices")
+        st.markdown(f"##### {t('The other US indices')}")
         peer_rows = []
         for peer in INDEX_ORDER:
             row = lookup_snapshot(snap, peer)
             peer_rows.append({
-                "Index": INDEX_META[peer]["display"],
-                "Last": format_last(peer, row.get("last", np.nan)),
-                "Chg%": format_chg(row.get("chg_pct", np.nan), True),
+                t("Index"): INDEX_META[peer]["display"],
+                t("Last"): format_last(peer, row.get("last", np.nan)),
+                t("Chg%"): format_chg(row.get("chg_pct", np.nan), True),
             })
         st.dataframe(pd.DataFrame(peer_rows), width="stretch", hide_index=True, height=148)
 
@@ -1559,7 +1594,7 @@ def render_index_page() -> None:
                     paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
                     hovermode="x unified",
-                    yaxis_title="Start = 100",
+                    yaxis_title=t("Start = 100"),
                 )
                 fig_cmp.update_xaxes(showgrid=False)
                 fig_cmp.update_yaxes(gridcolor=GRID_COLOR, zeroline=False)
@@ -1567,10 +1602,10 @@ def render_index_page() -> None:
                 fig_cmp.update_layout(showlegend=True)
                 fig_cmp.add_hline(y=100, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
                 help_chart(fig_cmp, "comparison", "index_comparison", width="stretch", config={"displayModeBar": False})
-                st.caption("Each line starts at 100 one year ago, so you can compare path, not the raw index level.")
+                st.caption(t("Each line starts at 100 one year ago, so you can compare path, not the raw index level."))
 
-        st.markdown("##### Names inside this index")
-        st.caption(f"{proxy} is a fund that tracks {meta['display']}. The names below are well-known members, not a complete list.")
+        st.markdown(f"##### {t('Names inside this index')}")
+        st.caption(t("{proxy} is a fund that tracks {display}. The names below are well-known members, not a complete list.", proxy=proxy, display=meta["display"]))
         rel = st.columns(len(meta["related"]))
         for col, symbol in zip(rel, meta["related"]):
             row = lookup_snapshot(snap, symbol)
@@ -1580,25 +1615,26 @@ def render_index_page() -> None:
                 go_to("Home")
                 st.rerun()
 
-    st.markdown("##### How to read this page")
-    st.markdown(
+    st.markdown(f"##### {t('How to read this page')}")
+    st.markdown(t(
         "- **Full chart** hides the notes and enlarges the same quote chart.\n"
-        f"- **＋ {proxy}** adds a fund that follows this index to your watchlist. You cannot buy the index itself.\n"
+        "- **＋ {proxy}** adds a fund that follows this index to your watchlist. You cannot buy the index itself.\n"
         "- Header change is versus the **previous close**, not versus the left edge of the chart.\n"
-        "- This is a classroom summary, not a trading terminal."
-    )
+        "- This is a classroom summary, not a trading terminal.",
+        proxy=proxy,
+    ))
 
 
 def render_home() -> None:
     st.markdown(
-        '<div class="hero-title">Stock market for beginner.</div>'
-        '<p class="hero-sub">US stock market main indices</p>',
+        f'<div class="hero-title">{t("Stock market for beginner.")}</div>'
+        f'<p class="hero-sub">{t("US stock market main indices")}</p>',
         unsafe_allow_html=True,
     )
 
     selected = st.session_state.selected_symbol
     needed = tuple(dict.fromkeys([*INDEX_ORDER, *st.session_state.get("watchlist", []), selected]))
-    with st.spinner("Updating quotes…"):
+    with st.spinner(t("Updating quotes…")):
         try:
             prices = download_prices(needed, "5d")
         except Exception:
@@ -1624,23 +1660,28 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
         )
     with type_col:
         st.segmented_control(
-            "Chart type",
+            t("Chart type"),
             options=CHART_TYPES,
             key="chart_type",
             on_change=remember_chart_type,
+            format_func=lambda kind: t(kind),
         )
     with help_col:
         chart_type = st.session_state.get("chart_type") or "Line"
         chart_help_button(f"price_{chart_type.lower()}", "home")
     with add_col:
-        if st.button("Add ＋", key="chart_add", help="Add this symbol to Watchlist", type="secondary"):
+        if st.button(t("Add ＋"), key="chart_add", help=t("Add this symbol to Watchlist"), type="secondary"):
             st.session_state.flash = add_to_watchlist(ticker)
             st.rerun()
 
     last = quote.get("last", np.nan)
     chg = quote.get("chg", np.nan)
     chg_pct = quote.get("chg_pct", np.nan)
-    unit = INDEX_META[ticker]["unit"].upper() if is_index(ticker) else "USD"
+    if is_index(ticker):
+        raw_unit = INDEX_META[ticker]["unit"]
+        unit = t(raw_unit) if raw_unit in ("point", "USD") else raw_unit.upper()
+    else:
+        unit = t("USD") if is_zh() else "USD"
     last_html = "—" if pd.isna(last) else (
         f"{last:,.2f}" if is_index(ticker) else f"${last:,.2f}"
     )
@@ -1651,21 +1692,22 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
     )
 
     st.pills(
-        "Range",
+        t("Range"),
         list(CHART_RANGES.keys()),
         key="chart_range",
         on_change=remember_chart_range,
         label_visibility="collapsed",
+        format_func=lambda rng: t(rng),
     )
 
     range_key = st.session_state.get("chart_range") or st.session_state.get("chart_range_persist") or "1D"
     if range_key not in CHART_RANGES:
         range_key = "1D"
     spec = CHART_RANGES[range_key]
-    with st.spinner("Loading chart…"):
+    with st.spinner(t("Loading chart…")):
         series = download_ohlc(ticker, spec["period"], spec["interval"])
     if series.empty:
-        st.info("No bars for this range yet. Markets may be closed, or Yahoo did not return data.")
+        st.info(t("No bars for this range yet. Markets may be closed, or Yahoo did not return data."))
     else:
         prev_close = None
         if pd.notna(quote.get("last")) and pd.notna(quote.get("chg")):
@@ -1679,18 +1721,17 @@ def render_selected_chart(ticker: str, snap: pd.DataFrame) -> None:
         )
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
         as_of = to_new_york_time(series.index[-1])
-        st.caption(
-            f"Range {range_key} · last bar {as_of.strftime('%Y-%m-%d %H:%M %Z')}. "
-            "Regular US hours only — nights, weekends, and holidays are hidden so the line stays continuous. "
-            "Yahoo Finance / yfinance; may be delayed."
-        )
-    if st.button("Open stock details"):
+        st.caption(t(
+            "Range {range} · last bar {as_of}. Regular US hours only — nights, weekends, and holidays are hidden so the line stays continuous. Yahoo Finance / yfinance; may be delayed.",
+            range=t(range_key), as_of=as_of.strftime("%Y-%m-%d %H:%M %Z"),
+        ))
+    if st.button(t("Open stock details")):
         go_to("Stock Research")
         st.rerun()
 
 
 def load_universe(period: str) -> tuple[pd.DataFrame, pd.DataFrame, str]:
-    with st.spinner("Loading the starter universe from Yahoo Finance…"):
+    with st.spinner(t("Loading the starter universe from Yahoo Finance…")):
         try:
             prices = download_prices(tuple(UNIVERSE.keys()), period)
             error = ""
@@ -1715,13 +1756,13 @@ def load_universe(period: str) -> tuple[pd.DataFrame, pd.DataFrame, str]:
 def render_markets(section: str) -> None:
     """Render each market tool directly from the top navigation."""
     descriptions = {
-        "Market Overview": "The wider market at a glance: group heatmaps, leading stocks, daily movers and volume.",
-        "Screener": "Find stocks by return, volatility and trading activity, then export your shortlist.",
-        "Live Quotes": "Follow intraday price, candles and volume, with a short list of symbols to monitor.",
-        "Returns & Risk": "Compare historical performance, volatility and drawdowns across stocks and ETFs.",
-        "Stock Research": "Explore one stock or index through price history, return metrics and company fundamentals.",
+        "Market Overview": t("The wider market at a glance: group heatmaps, leading stocks, daily movers and volume."),
+        "Screener": t("Find stocks by return, volatility and trading activity, then export your shortlist."),
+        "Live Quotes": t("Follow intraday price, candles and volume, with a short list of symbols to monitor."),
+        "Returns & Risk": t("Compare historical performance, volatility and drawdowns across stocks and ETFs."),
+        "Stock Research": t("Explore one stock or index through price history, return metrics and company fundamentals."),
     }
-    st.markdown(f'<div class="hero-title">{html.escape(section)}</div><p class="hero-sub">{html.escape(descriptions[section])}</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="hero-title">{html.escape(t(section))}</div><p class="hero-sub">{html.escape(descriptions[section])}</p>', unsafe_allow_html=True)
 
     if section == "Live Quotes":
         render_live_quotes()
@@ -1733,20 +1774,23 @@ def render_markets(section: str) -> None:
     period_col, group_col = st.columns(2, gap="medium")
     with period_col:
         period = st.selectbox(
-            "Look-back window",
+            t("Look-back window"),
             options=list(PERIOD_LABELS.keys()),
-            format_func=lambda x: PERIOD_LABELS[x],
-            key="analysis_period",
+            format_func=period_label,
+            key=lang_key("analysis_period"),
         )
     selected_sector = "All groups"
     if section != "Returns & Risk":
         with group_col:
             sector_options = ["All groups"] + sorted(set(UNIVERSE.values()))
-            selected_sector = st.selectbox("Group filter", options=sector_options, index=0, key="market_group_filter")
+            selected_sector = st.selectbox(
+                t("Group filter"), options=sector_options, index=0, key=lang_key("market_group_filter"),
+                format_func=lambda g: t(g),
+            )
 
     prices, metrics, load_error = load_universe(period)
     if prices.empty:
-        st.error("Could not load daily history. Check the network or Yahoo Finance, then retry.")
+        st.error(t("Could not load daily history. Check the network or Yahoo Finance, then retry."))
         if load_error:
             st.code(load_error)
         return
@@ -1781,11 +1825,11 @@ def render_overview(
     mean_return = metrics["Period return (%)"].mean() if not metrics.empty else np.nan
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Symbols loaded", f"{loaded_tickers}", help="Starter watch universe, not the whole US market.")
-    k2.metric(f"Average return · {PERIOD_LABELS[period]}", pct(mean_return))
-    k3.metric("Share with a positive return", pct(positive_share))
-    k4.metric("Median annualized volatility", pct(median_vol))
-    st.caption(f"As of {latest_date} · {PERIOD_LABELS[period]} · {len(UNIVERSE)} starter symbols")
+    k1.metric(t("Symbols loaded"), f"{loaded_tickers}", help=t("Starter watch universe, not the whole US market."))
+    k2.metric(t("Average return · {period}", period=period_label(period)), pct(mean_return))
+    k3.metric(t("Share with a positive return"), pct(positive_share))
+    k4.metric(t("Median annualized volatility"), pct(median_vol))
+    st.caption(t("As of {date} · {period} · {n} starter symbols", date=latest_date, period=period_label(period), n=len(UNIVERSE)))
 
     left, right = st.columns([1.15, 0.85], gap="large")
     with left:
@@ -1793,20 +1837,20 @@ def render_overview(
         if fig_heat is not None:
             help_chart(fig_heat, "heatmap", "heatmap", width="stretch", config={"displayModeBar": False})
         else:
-            st.info("Not enough history in this window to draw the monthly heatmap.")
+            st.info(t("Not enough history in this window to draw the monthly heatmap."))
     with right:
         ranked = metrics_view.sort_values("Period return (%)", ascending=False).head(15)
-        fig_rank = signed_hbar(ranked, "Period return (%)", "Ticker", "Top 15 in this window", "Period return")
+        fig_rank = signed_hbar(ranked, "Period return (%)", "Ticker", t("Top 15 in this window"), t("Period return"))
         help_chart(fig_rank, "ranking", "ranking", width="stretch", config={"displayModeBar": False})
 
-    st.subheader("Today's movers in the starter list")
+    st.subheader(t("Today's movers in the starter list"))
     stocks_only = metrics[~metrics["Ticker"].isin(["SPY", "QQQ", "DIA"])].copy()
     valid_daily = stocks_only["Day chg (%)"].dropna() if "Day chg (%)" in stocks_only.columns else pd.Series(dtype=float)
     breadth = st.columns(4)
-    breadth[0].metric("Stocks watched", f"{len(stocks_only)}")
-    breadth[1].metric("Up", f"{int((valid_daily > 0).sum())}")
-    breadth[2].metric("Down", f"{int((valid_daily < 0).sum())}")
-    breadth[3].metric("Flat", f"{int((valid_daily == 0).sum())}")
+    breadth[0].metric(t("Stocks watched"), f"{len(stocks_only)}")
+    breadth[1].metric(t("Up"), f"{int((valid_daily > 0).sum())}")
+    breadth[2].metric(t("Down"), f"{int((valid_daily < 0).sum())}")
+    breadth[3].metric(t("Flat"), f"{int((valid_daily == 0).sum())}")
 
     movers_left, movers_right = st.columns(2, gap="large")
     with movers_left:
@@ -1815,22 +1859,22 @@ def render_overview(
         else:
             gainers = pd.DataFrame()
         if not gainers.empty:
-            fig_gainers = signed_hbar(gainers, "Day chg (%)", "Ticker", "Gainers · top 10", "Day change")
+            fig_gainers = signed_hbar(gainers, "Day chg (%)", "Ticker", t("Gainers · top 10"), t("Day change"))
             help_chart(fig_gainers, "gainers", "gainers", width="stretch", config={"displayModeBar": False})
         else:
-            st.info("Not enough data for a gainer list.")
+            st.info(t("Not enough data for a gainer list."))
     with movers_right:
         if "Day chg (%)" in stocks_only.columns:
             losers = stocks_only.dropna(subset=["Day chg (%)"]).nsmallest(10, "Day chg (%)")
         else:
             losers = pd.DataFrame()
         if not losers.empty:
-            fig_losers = signed_hbar(losers, "Day chg (%)", "Ticker", "Losers · bottom 10", "Day change")
+            fig_losers = signed_hbar(losers, "Day chg (%)", "Ticker", t("Losers · bottom 10"), t("Day change"))
             help_chart(fig_losers, "losers", "losers", width="stretch", config={"displayModeBar": False})
         else:
-            st.info("Not enough data for a loser list.")
+            st.info(t("Not enough data for a loser list."))
 
-    st.markdown("#### Volume leaders")
+    st.markdown(f"#### {t('Volume leaders')}")
     volume_rank = stocks_only.dropna(subset=["Volume"]).nlargest(10, "Volume")
     if not volume_rank.empty:
         ordered = volume_rank.sort_values("Volume")
@@ -1839,11 +1883,11 @@ def render_overview(
         fig_volume_rank = go.Figure(go.Bar(
             x=ordered["Volume"], y=ordered["Ticker"], orientation="h",
             marker_color=colors, marker_line_width=0,
-            hovertemplate="%{y}: %{x:,.0f} shares<extra></extra>",
+            hovertemplate=t("%{y}: %{x:,.0f} shares<extra></extra>"),
         ))
         fig_volume_rank.update_layout(
-            title="Highest volume in the latest session",
-            height=410, xaxis_title="Shares", yaxis_title="",
+            title=t("Highest volume in the latest session"),
+            height=410, xaxis_title=t("Shares"), yaxis_title="",
             margin=dict(l=8, r=12, t=48, b=8),
             paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
             showlegend=False,
@@ -1852,25 +1896,31 @@ def render_overview(
         fig_volume_rank.update_yaxes(showgrid=False)
         help_chart(fig_volume_rank, "volume", "volume", width="stretch", config={"displayModeBar": False})
 
-    st.subheader("Starter universe")
+    st.subheader(t("Starter universe"))
     table_cols = ["Ticker", "Company", "Group", "Last", "Period return (%)", "Ann. volatility (%)", "Max drawdown (%)", "Avg volume", "Volume", "As of"]
     display_metrics = metrics_view.sort_values("Period return (%)", ascending=False)
-    display_metrics = display_metrics[[c for c in table_cols if c in display_metrics.columns]]
+    display_metrics = display_metrics[[c for c in table_cols if c in display_metrics.columns]].copy()
+    if "Group" in display_metrics.columns:
+        display_metrics["Group"] = display_metrics["Group"].map(lambda g: t(g))
     st.dataframe(
         display_metrics,
         width="stretch",
         hide_index=True,
         column_config={
-            "Last": st.column_config.NumberColumn(format="$%.2f"),
-            "Period return (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Ann. volatility (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Max drawdown (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Avg volume": st.column_config.NumberColumn(format="%.0f"),
-            "Volume": st.column_config.NumberColumn(format="%.0f"),
+            "Ticker": st.column_config.TextColumn(t("Ticker")),
+            "Company": st.column_config.TextColumn(t("Company")),
+            "Group": st.column_config.TextColumn(t("Group")),
+            "Last": st.column_config.NumberColumn(t("Last"), format="$%.2f"),
+            "Period return (%)": st.column_config.NumberColumn(t("Period return (%)"), format="%.2f%%"),
+            "Ann. volatility (%)": st.column_config.NumberColumn(t("Ann. volatility (%)"), format="%.2f%%"),
+            "Max drawdown (%)": st.column_config.NumberColumn(t("Max drawdown (%)"), format="%.2f%%"),
+            "Avg volume": st.column_config.NumberColumn(t("Avg volume"), format="%.0f"),
+            "Volume": st.column_config.NumberColumn(t("Volume"), format="%.0f"),
+            "As of": st.column_config.DateColumn(t("As of")),
         },
     )
     st.download_button(
-        "Download this table as CSV",
+        t("Download this table as CSV"),
         data=display_metrics.to_csv(index=False).encode("utf-8-sig"),
         file_name="stockscope_universe.csv",
         mime="text/csv",
@@ -1878,65 +1928,68 @@ def render_overview(
 
 
 def render_screener(metrics_view: pd.DataFrame) -> None:
-    st.subheader("Narrow the starter list by return and risk")
+    st.subheader(t("Narrow the starter list by return and risk"))
     fc1, fc2, fc3 = st.columns(3)
-    min_return = fc1.slider("Minimum period return (%)", min_value=-100, max_value=200, value=-100, step=5)
-    max_vol = fc2.slider("Maximum annualized volatility (%)", min_value=0, max_value=150, value=150, step=5)
-    sort_by = fc3.selectbox(
-        "Sort by",
-        ["Period return (%)", "Ann. volatility (%)", "Max drawdown (%)", "Avg volume"],
-        index=0,
-    )
+    min_return = fc1.slider(t("Minimum period return (%)"), min_value=-100, max_value=200, value=-100, step=5)
+    max_vol = fc2.slider(t("Maximum annualized volatility (%)"), min_value=0, max_value=150, value=150, step=5)
+    sort_keys = ["Period return (%)", "Ann. volatility (%)", "Max drawdown (%)", "Avg volume"]
+    sort_by = fc3.selectbox(t("Sort by"), sort_keys, index=0, format_func=lambda col: t(col))
     filtered = metrics_view[
         (metrics_view["Period return (%)"].fillna(-999) >= min_return)
         & (metrics_view["Ann. volatility (%)"].fillna(999) <= max_vol)
     ].copy()
     ascending = sort_by in ["Ann. volatility (%)", "Max drawdown (%)"]
     filtered = filtered.sort_values(sort_by, ascending=ascending)
-    st.write(f"Symbols that match: **{len(filtered)}**")
+    if "Group" in filtered.columns:
+        filtered = filtered.copy()
+        filtered["Group"] = filtered["Group"].map(lambda g: t(g))
+    st.write(t("Symbols that match: **{n}**", n=len(filtered)))
     st.dataframe(
         filtered,
         width="stretch",
         hide_index=True,
         column_config={
-            "Last": st.column_config.NumberColumn(format="$%.2f"),
-            "Day chg (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Period return (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Ann. volatility (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Max drawdown (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            "Avg volume": st.column_config.NumberColumn(format="%.0f"),
-            "Volume": st.column_config.NumberColumn(format="%.0f"),
+            "Ticker": st.column_config.TextColumn(t("Ticker")),
+            "Company": st.column_config.TextColumn(t("Company")),
+            "Group": st.column_config.TextColumn(t("Group")),
+            "Last": st.column_config.NumberColumn(t("Last"), format="$%.2f"),
+            "Day chg (%)": st.column_config.NumberColumn(t("Day change"), format="%.2f%%"),
+            "Period return (%)": st.column_config.NumberColumn(t("Period return (%)"), format="%.2f%%"),
+            "Ann. volatility (%)": st.column_config.NumberColumn(t("Ann. volatility (%)"), format="%.2f%%"),
+            "Max drawdown (%)": st.column_config.NumberColumn(t("Max drawdown (%)"), format="%.2f%%"),
+            "Avg volume": st.column_config.NumberColumn(t("Avg volume"), format="%.0f"),
+            "Volume": st.column_config.NumberColumn(t("Volume"), format="%.0f"),
         },
     )
     st.download_button(
-        "Download screener CSV",
+        t("Download screener CSV"),
         data=filtered.to_csv(index=False).encode("utf-8-sig"),
         file_name="stockscope_filtered_stocks.csv",
         mime="text/csv",
     )
-    st.markdown(
+    st.markdown(t(
         "**What the numbers mean:** period return uses the first and last valid close in the window; "
         "annualized volatility is the daily-return standard deviation × √252; "
         "max drawdown is the worst drop from a peak close."
-    )
+    ))
 
 
 def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> None:
-    st.subheader("Compare return and volatility")
-    default = [t for t in ["AAPL", "MSFT", "NVDA", "SPY"] if t in UNIVERSE]
+    st.subheader(t("Compare return and volatility"))
+    default = [sym for sym in ["AAPL", "MSFT", "NVDA", "SPY"] if sym in UNIVERSE]
     compare_tickers = st.multiselect(
-        "Symbols to compare",
+        t("Symbols to compare"),
         options=list(UNIVERSE.keys()),
         default=default,
         format_func=ticker_label,
-        help="Up to about eight names keeps the chart readable.",
+        help=t("Up to about eight names keeps the chart readable."),
     )
     if not compare_tickers:
-        st.info("Pick at least one symbol.")
+        st.info(t("Pick at least one symbol."))
         return
     compare_data = prices[prices["ticker"].isin(compare_tickers)].copy()
     if compare_data.empty:
-        st.warning("No history for those symbols in this window.")
+        st.warning(t("No history for those symbols in this window."))
         return
     normalized = compare_data.sort_values("date").copy()
     normalized["Indexed (start = 100)"] = normalized.groupby("ticker")["close"].transform(
@@ -1944,38 +1997,38 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
     )
     fig_line = px.line(
         normalized, x="date", y="Indexed (start = 100)", color="ticker",
-        title=f"Rebased performance · {PERIOD_LABELS[period]}",
-        labels={"date": "Date", "ticker": "Ticker", "Indexed (start = 100)": "Rebased (start = 100)"},
+        title=t("Rebased performance · {period}", period=period_label(period)),
+        labels={"date": t("Date"), "ticker": t("Ticker"), "Indexed (start = 100)": t("Rebased (start = 100)")},
     )
     fig_line.add_hline(y=100, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
     fig_line.update_layout(
         height=470, hovermode="x unified",
-        yaxis_title="Rebased level (start of window = 100)",
-        xaxis_title="Date",
+        yaxis_title=t("Rebased level (start of window = 100)"),
+        xaxis_title=t("Date"),
         paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-        legend_title_text="Ticker",
+        legend_title_text=t("Ticker"),
     )
     fig_line.update_xaxes(showgrid=False)
     fig_line.update_yaxes(gridcolor=GRID_COLOR, zeroline=False, side="right")
     help_chart(fig_line, "comparison", "comparison", width="stretch", config={"displayModeBar": False})
-    st.caption("This is not the share price. Each series is rebased to 100 at the start of the window so you can compare percentage paths.")
+    st.caption(t("This is not the share price. Each series is rebased to 100 at the start of the window so you can compare percentage paths."))
     scat = metrics[metrics["Ticker"].isin(compare_tickers)].copy()
     if not scat.empty:
         fig_scatter = px.scatter(
             scat, x="Ann. volatility (%)", y="Period return (%)", color="Group", text="Ticker",
             hover_data={"Last": ":.2f", "Max drawdown (%)": ":.2f", "Avg volume": ":,.0f"},
-            title="Return vs risk",
+            title=t("Return vs risk"),
         )
         fig_scatter.update_traces(textposition="top center", marker={"size": 12, "opacity": 0.8})
         fig_scatter.add_hline(y=0, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
         fig_scatter.update_layout(
-            height=450, xaxis_title="Ann. volatility (%)", yaxis_title="Period return (%)",
+            height=450, xaxis_title=t("Ann. volatility (%)"), yaxis_title=t("Period return (%)"),
             paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
         )
         fig_scatter.update_xaxes(gridcolor=GRID_COLOR)
         fig_scatter.update_yaxes(gridcolor=GRID_COLOR, zeroline=True, zerolinecolor="#b2b5be")
         help_chart(fig_scatter, "risk", "risk", width="stretch", config={"displayModeBar": False})
-    st.caption("Past return and volatility describe history. They are not a forecast.")
+    st.caption(t("Past return and volatility describe history. They are not a forecast."))
 
 
 def render_stock_details() -> None:
@@ -1987,34 +2040,35 @@ def render_stock_details() -> None:
     if st.session_state.selected_symbol not in options:
         options.insert(0, st.session_state.selected_symbol)
     focus = st.selectbox(
-        "Symbol",
+        t("Symbol"),
         options=options,
         format_func=ticker_label,
         index=options.index(st.session_state.selected_symbol) if st.session_state.selected_symbol in options else 0,
-        key="stock_focus",
+        key=lang_key("stock_focus"),
     )
     st.session_state.selected_symbol = focus
     st.subheader(f"{company_name(focus)} · {display_symbol(focus)}")
-    st.caption(UNIVERSE.get(focus, INDEX_META.get(focus, {}).get("blurb", "Custom symbol")))
+    blurb = UNIVERSE.get(focus, INDEX_META.get(focus, {}).get("blurb", "Custom symbol"))
+    st.caption(t(blurb))
 
-    period = st.selectbox("History window", options=list(PERIOD_LABELS.keys()), index=3, format_func=lambda x: PERIOD_LABELS[x], key="stock_period")
-    with st.spinner("Loading this symbol…"):
+    period = st.selectbox(t("History window"), options=list(PERIOD_LABELS.keys()), index=3, format_func=period_label, key=lang_key("stock_period"))
+    with st.spinner(t("Loading this symbol…")):
         try:
             one_prices = download_prices((focus,), period)
         except Exception:
             one_prices = pd.DataFrame()
-            st.warning("Could not load daily history. Check the network or Yahoo Finance, then retry.")
+            st.warning(t("Could not load daily history. Check the network or Yahoo Finance, then retry."))
         series = download_ohlc(focus, period, "1d")
     if one_prices.empty and series.empty:
-        st.warning("Yahoo did not return history for this symbol.")
+        st.warning(t("Yahoo did not return history for this symbol."))
         return
     metrics = calculate_metrics(one_prices) if not one_prices.empty else pd.DataFrame()
     m = metrics.iloc[0] if not metrics.empty else pd.Series(dtype=object)
     a, b, c, dcol = st.columns(4)
-    a.metric("Last close", format_last(focus, m.get("Last", np.nan)))
-    b.metric("Period return", pct(m.get("Period return (%)", np.nan)))
-    c.metric("Ann. volatility", pct(m.get("Ann. volatility (%)", np.nan)))
-    dcol.metric("Max drawdown", pct(m.get("Max drawdown (%)", np.nan)))
+    a.metric(t("Last close"), format_last(focus, m.get("Last", np.nan)))
+    b.metric(t("Period return"), pct(m.get("Period return (%)", np.nan)))
+    c.metric(t("Ann. volatility"), pct(m.get("Ann. volatility (%)", np.nan)))
+    dcol.metric(t("Max drawdown"), pct(m.get("Max drawdown (%)", np.nan)))
 
     if not series.empty:
         prev_close = None
@@ -2023,34 +2077,34 @@ def render_stock_details() -> None:
             prev_close = last_px / (1 + float(m["Day chg (%)"]) / 100) if float(m["Day chg (%)"]) != -100 else None
         price_fig = build_price_chart(series, focus, "Candle", previous_close=prev_close, range_key="1Y")
         help_chart(price_fig, "stock", "stock", width="stretch", config={"displayModeBar": False})
-        st.caption("Daily OHLC candles. Weekends and holidays are hidden. Green = close ≥ open. Scale is zoomed to this window.")
+        st.caption(t("Daily OHLC candles. Weekends and holidays are hidden. Green = close ≥ open. Scale is zoomed to this window."))
 
     add_col, live_col = st.columns(2)
-    if add_col.button("Add to watchlist", width="stretch"):
+    if add_col.button(t("Add to watchlist"), width="stretch"):
         st.session_state.flash = add_to_watchlist(focus)
         st.rerun()
-    if live_col.button("Open live quotes", width="stretch"):
+    if live_col.button(t("Open live quotes"), width="stretch"):
         go_to("Live Quotes")
         st.rerun()
 
-    with st.expander("Optional Yahoo fundamentals (often incomplete)", expanded=False):
-        with st.spinner("Reading fundamentals…"):
+    with st.expander(t("Optional Yahoo fundamentals (often incomplete)"), expanded=False):
+        with st.spinner(t("Reading fundamentals…")):
             info = get_ticker_info(focus)
         fundamental_fields = [
-            ("marketCap", "Market cap", money),
-            ("trailingPE", "P/E (TTM)", lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
-            ("forwardPE", "Forward P/E", lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
-            ("priceToBook", "Price / book", lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
-            ("revenueGrowth", "Revenue growth", lambda x: pct(x * 100) if pd.notna(x) else "—"),
-            ("profitMargins", "Profit margin", lambda x: pct(x * 100) if pd.notna(x) else "—"),
-            ("returnOnEquity", "Return on equity", lambda x: pct(x * 100) if pd.notna(x) else "—"),
-            ("totalRevenue", "Revenue", money),
-            ("freeCashflow", "Free cash flow", money),
-            ("fiftyTwoWeekHigh", "52-week high", lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
-            ("fiftyTwoWeekLow", "52-week low", lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
+            ("marketCap", t("Market cap"), money),
+            ("trailingPE", t("P/E (TTM)"), lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
+            ("forwardPE", t("Forward P/E"), lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
+            ("priceToBook", t("Price / book"), lambda x: f"{x:.2f}x" if pd.notna(x) else "—"),
+            ("revenueGrowth", t("Revenue growth"), lambda x: pct(x * 100) if pd.notna(x) else "—"),
+            ("profitMargins", t("Profit margin"), lambda x: pct(x * 100) if pd.notna(x) else "—"),
+            ("returnOnEquity", t("Return on equity"), lambda x: pct(x * 100) if pd.notna(x) else "—"),
+            ("totalRevenue", t("Revenue"), money),
+            ("freeCashflow", t("Free cash flow"), money),
+            ("fiftyTwoWeekHigh", t("52-week high"), lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
+            ("fiftyTwoWeekLow", t("52-week low"), lambda x: f"${x:,.2f}" if pd.notna(x) else "—"),
         ]
         if not info:
-            st.warning("Yahoo did not return fundamentals. Price and volume still work.")
+            st.warning(t("Yahoo did not return fundamentals. Price and volume still work."))
         else:
             fundamental_rows = []
             for key, label, formatter in fundamental_fields:
@@ -2060,80 +2114,84 @@ def render_stock_details() -> None:
                     shown = formatter(val_num)
                 except (ValueError, TypeError):
                     shown = "—"
-                fundamental_rows.append({"Field": label, "Value": shown})
+                fundamental_rows.append({t("Field"): label, t("Value"): shown})
             st.dataframe(pd.DataFrame(fundamental_rows), width="stretch", hide_index=True)
-            st.caption("Confirm anything important in company filings. Yahoo fields vary by name and update schedule.")
+            st.caption(t("Confirm anything important in company filings. Yahoo fields vary by name and update schedule."))
 
 
 def render_live_quotes() -> None:
-    st.caption("This is a classroom feed, not an execution quote.")
+    st.caption(t("This is a classroom feed, not an execution quote."))
 
     universe_options = list(dict.fromkeys([st.session_state.selected_symbol, *UNIVERSE.keys()]))
     default_live = st.session_state.selected_symbol if st.session_state.selected_symbol in universe_options else "AAPL"
     live_controls = st.columns([1.5, 1, 1.2, 1.4, 1.1])
     live_ticker = live_controls[0].selectbox(
-        "Symbol",
+        t("Symbol"),
         options=universe_options,
         index=universe_options.index(default_live) if default_live in universe_options else 0,
         format_func=ticker_label,
-        key="live_ticker",
+        key=lang_key("live_ticker"),
     )
     st.session_state.selected_symbol = live_ticker
     live_interval = live_controls[1].selectbox(
-        "Bar size",
+        t("Bar size"),
         options=["1m", "5m", "15m", "30m", "60m"],
         index=0,
-        format_func=lambda x: {"1m": "1 min", "5m": "5 min", "15m": "15 min", "30m": "30 min", "60m": "60 min"}[x],
-        key="live_interval",
+        format_func=lambda x: t({"1m": "1 min", "5m": "5 min", "15m": "15 min", "30m": "30 min", "60m": "60 min"}[x]),
+        key=lang_key("live_interval"),
     )
     refresh_label = live_controls[2].selectbox(
-        "Auto refresh",
+        t("Auto refresh"),
         options=["Manual", "Every 15s", "Every 30s", "Every 60s"],
         index=2,
-        key="live_refresh_mode",
+        key=lang_key("live_refresh_mode"),
+        format_func=lambda mode: t(mode),
     )
     refresh_seconds = {"Manual": None, "Every 15s": 15, "Every 30s": 30, "Every 60s": 60}[refresh_label]
-    include_extended = live_controls[3].checkbox("Include pre/post", value=True, key="live_extended")
-    if live_controls[4].button("↻ Refresh now", width="stretch", key="live_force_refresh"):
+    include_extended = live_controls[3].checkbox(t("Include pre/post"), value=True, key="live_extended")
+    if live_controls[4].button(t("↻ Refresh now"), width="stretch", key="live_force_refresh"):
         download_intraday_one.clear()
         st.rerun()
 
     default_watch = [t for t in st.session_state.get("watchlist", ["AAPL", "MCD"]) if t in UNIVERSE][:6]
     live_watchlist = st.multiselect(
-        "Also watch (keep to six names to limit requests)",
+        t("Also watch (keep to six names to limit requests)"),
         options=list(UNIVERSE.keys()),
         default=default_watch,
         format_func=ticker_label,
-        key="live_watchlist",
-        help="Each row is the latest returned minute bar, not a time-and-sales print.",
+        key=lang_key("live_watchlist"),
+        help=t("Each row is the latest returned minute bar, not a time-and-sales print."),
     )
     interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "60m": 60}
-    st.info(
+    st.info(t(
         "Refresh is how often this app asks again. It is not a promise of a live or 15-minute-delayed feed. "
         "Yahoo / yfinance can lag, skip bars, or throttle."
-    )
+    ))
 
     @st.fragment(run_every=refresh_seconds)
     def render_live_monitor(selected_symbol: str, selected_interval: str, extended: bool, watchlist_symbols: list[str]):
         now_et = pd.Timestamp.now(tz="America/New_York")
-        st.caption(
-            f"New York time: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')} · "
-            f"{estimated_us_session(now_et)} · auto refresh: {refresh_label}. "
-            "The session label does not check exchange holidays."
-        )
+        st.caption(t(
+            "New York time: {now} · {session} · auto refresh: {refresh}. "
+            "The session label does not check exchange holidays.",
+            now=now_et.strftime("%Y-%m-%d %H:%M:%S %Z"),
+            session=estimated_us_session(now_et),
+            refresh=t(refresh_label),
+        ))
         try:
             intraday = download_intraday_one(selected_symbol, selected_interval, extended)
         except Exception as exc:
-            st.error("Could not load minute bars. Network, Yahoo, or rate limits are the usual causes.")
-            with st.expander("Technical error"):
+            st.error(t("Could not load minute bars. Network, Yahoo, or rate limits are the usual causes."))
+            with st.expander(t("Technical error")):
                 st.code(str(exc))
             intraday = pd.DataFrame()
 
         if intraday.empty:
-            st.warning(
-                f"{selected_symbol} did not return {selected_interval} bars. "
-                "If the US session is closed, wait for the next trading day, or turn off pre/post and retry."
-            )
+            st.warning(t(
+                "{symbol} did not return {interval} bars. "
+                "If the US session is closed, wait for the next trading day, or turn off pre/post and retry.",
+                symbol=selected_symbol, interval=selected_interval,
+            ))
         else:
             valid = intraday.dropna(subset=["Close"]).copy()
             last = valid.iloc[-1]
@@ -2145,44 +2203,44 @@ def render_live_quotes() -> None:
             last_volume = float(last["Volume"]) if pd.notna(last["Volume"]) else np.nan
             stale_threshold = max(3.0, interval_minutes[selected_interval] * 2.0)
             if age_minutes < 0:
-                status_text = "Latest bar timestamp is slightly ahead of this clock; check again on the next refresh"
+                status_text = t("Latest bar timestamp is slightly ahead of this clock; check again on the next refresh")
             elif age_minutes <= stale_threshold:
-                status_text = "Latest bar timestamp is close to now (not a live-data guarantee)"
+                status_text = t("Latest bar timestamp is close to now (not a live-data guarantee)")
             else:
-                status_text = "Latest bar looks stale; the session may be closed or the feed may have paused"
-            st.caption(
-                f"{status_text} · bar time {last_ts_et.strftime('%Y-%m-%d %H:%M:%S %Z')} · "
-                f"about {age_minutes:.1f} minutes from this clock."
-            )
+                status_text = t("Latest bar looks stale; the session may be closed or the feed may have paused")
+            st.caption(t(
+                "{status} · bar time {bar_time} · about {age:.1f} minutes from this clock.",
+                status=status_text, bar_time=last_ts_et.strftime("%Y-%m-%d %H:%M:%S %Z"), age=age_minutes,
+            ))
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Last returned price", f"${last_close:,.2f}", help="Close of the minute bar, not a trade print.")
-            m2.metric("Vs previous bar", f"{bar_change:+.2f}%" if pd.notna(bar_change) else "—")
-            m3.metric("Bar volume", f"{last_volume:,.0f}" if pd.notna(last_volume) else "—")
-            m4.metric("Bars returned", f"{len(valid):,}")
+            m1.metric(t("Last returned price"), f"${last_close:,.2f}", help=t("Close of the minute bar, not a trade print."))
+            m2.metric(t("Vs previous bar"), f"{bar_change:+.2f}%" if pd.notna(bar_change) else "—")
+            m3.metric(t("Bar volume"), f"{last_volume:,.0f}" if pd.notna(last_volume) else "—")
+            m4.metric(t("Bars returned"), f"{len(valid):,}")
 
             live_fig = build_price_chart(valid, selected_symbol, "Candle", range_key="1D", include_extended=extended)
             help_chart(live_fig, "intraday", "intraday", width="stretch", config={"displayModeBar": False})
             st.caption(
-                ("Intraday OHLC candles including pre/post-market hours. " if extended else
-                 "Intraday OHLC candles on regular US hours only (nights hidden). ") +
-                "Green = that bar closed ≥ open. This is a classroom feed, not an exchange plot."
+                (t("Intraday OHLC candles including pre/post-market hours. ") if extended else
+                 t("Intraday OHLC candles on regular US hours only (nights hidden). ")) +
+                t("Green = that bar closed ≥ open. This is a classroom feed, not an exchange plot.")
             )
 
-            with st.expander("Latest minute rows", expanded=False):
+            with st.expander(t("Latest minute rows"), expanded=False):
                 detail = valid.tail(30).copy()
                 detail.index.name = "Time"
                 st.dataframe(detail.sort_index(ascending=False), width="stretch")
                 st.download_button(
-                    "Download minute CSV",
+                    t("Download minute CSV"),
                     data=detail.reset_index().to_csv(index=False).encode("utf-8-sig"),
                     file_name=f"{selected_symbol}_{selected_interval}_intraday.csv",
                     mime="text/csv",
                     key=f"download_live_{selected_symbol}_{selected_interval}",
                 )
 
-        st.markdown("### Watchlist bars")
+        st.markdown(f"### {t('Watchlist bars')}")
         if not watchlist_symbols:
-            st.info("Pick at least one extra symbol above.")
+            st.info(t("Pick at least one extra symbol above."))
         else:
             records = []
             symbols = list(dict.fromkeys(watchlist_symbols[:6]))
@@ -2191,9 +2249,9 @@ def render_live_quotes() -> None:
                     bars = download_intraday_one(symbol, selected_interval, extended)
                     if bars.empty:
                         records.append({
-                            "Ticker": symbol, "Company": COMPANY_NAMES.get(symbol, symbol),
+                            "Ticker": symbol, "Company": company_name(symbol),
                             "Last": np.nan, "Bar chg (%)": np.nan, "Bar volume": np.nan,
-                            "Bar time (ET)": "No data", "Age (min)": np.nan, "Status": "No data",
+                            "Bar time (ET)": t("No data"), "Age (min)": np.nan, "Status": t("No data"),
                         })
                         continue
                     bars = bars.dropna(subset=["Close"]).sort_index()
@@ -2203,10 +2261,10 @@ def render_live_quotes() -> None:
                     age = (now - latest_time).total_seconds() / 60
                     previous = float(bars["Close"].iloc[-2]) if len(bars) >= 2 else np.nan
                     change = (float(latest["Close"]) / previous - 1) * 100 if pd.notna(previous) and previous else np.nan
-                    status = "Fresh timestamp" if 0 <= age <= max(3, interval_minutes[selected_interval] * 2) else "Check update status"
+                    status = t("Fresh timestamp") if 0 <= age <= max(3, interval_minutes[selected_interval] * 2) else t("Check update status")
                     records.append({
                         "Ticker": symbol,
-                        "Company": COMPANY_NAMES.get(symbol, symbol),
+                        "Company": company_name(symbol),
                         "Last": float(latest["Close"]),
                         "Bar chg (%)": change,
                         "Bar volume": float(latest["Volume"]) if pd.notna(latest["Volume"]) else np.nan,
@@ -2216,9 +2274,9 @@ def render_live_quotes() -> None:
                     })
                 except Exception as exc:
                     records.append({
-                        "Ticker": symbol, "Company": COMPANY_NAMES.get(symbol, symbol),
+                        "Ticker": symbol, "Company": company_name(symbol),
                         "Last": np.nan, "Bar chg (%)": np.nan, "Bar volume": np.nan,
-                        "Bar time (ET)": "Request failed", "Age (min)": np.nan, "Status": str(exc)[:80],
+                        "Bar time (ET)": t("Request failed"), "Age (min)": np.nan, "Status": str(exc)[:80],
                     })
             quote_table = pd.DataFrame(records)
             st.dataframe(
@@ -2226,13 +2284,17 @@ def render_live_quotes() -> None:
                 width="stretch",
                 hide_index=True,
                 column_config={
-                    "Last": st.column_config.NumberColumn(format="$%.2f"),
-                    "Bar chg (%)": st.column_config.NumberColumn(format="%.2f%%"),
-                    "Bar volume": st.column_config.NumberColumn(format="%.0f"),
-                    "Age (min)": st.column_config.NumberColumn(format="%.1f"),
+                    "Ticker": st.column_config.TextColumn(t("Ticker")),
+                    "Company": st.column_config.TextColumn(t("Company")),
+                    "Last": st.column_config.NumberColumn(t("Last"), format="$%.2f"),
+                    "Bar chg (%)": st.column_config.NumberColumn(t("Bar chg (%)"), format="%.2f%%"),
+                    "Bar volume": st.column_config.NumberColumn(t("Bar volume"), format="%.0f"),
+                    "Bar time (ET)": st.column_config.TextColumn(t("Bar time (ET)")),
+                    "Age (min)": st.column_config.NumberColumn(t("Age (min)"), format="%.1f"),
+                    "Status": st.column_config.TextColumn(t("Status")),
                 },
             )
-        st.caption("Age is only the gap between the bar timestamp and this clock, not the true exchange-to-screen delay.")
+        st.caption(t("Age is only the gap between the bar timestamp and this clock, not the true exchange-to-screen delay."))
 
     render_live_monitor(live_ticker, live_interval, include_extended, live_watchlist)
 
@@ -2356,6 +2418,7 @@ def main() -> None:
     init_state()
     apply_pending_widgets()
     st.markdown(APP_STYLE, unsafe_allow_html=True)
+    st.markdown(language_css(), unsafe_allow_html=True)
     render_top_nav()
 
     nav = st.session_state.nav
@@ -2375,8 +2438,7 @@ def main() -> None:
 
     st.markdown("---")
     st.markdown(
-        "<div class='small-note'>StockScope · classroom prototype · verify definitions and data rights yourself. "
-        "This tool is not investment advice.</div>",
+        f"<div class='small-note'>{t('StockScope · classroom prototype · verify definitions and data rights yourself. This tool is not investment advice.')}</div>",
         unsafe_allow_html=True,
     )
 
