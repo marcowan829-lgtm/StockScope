@@ -968,9 +968,12 @@ def hero(title: str, subtitle: str, eyebrow: str = "STOCKSCOPE LEARN · BEGINNER
 
 
 def section_heading(kicker: str, title: str, desc: str | None = None) -> None:
-    st.markdown(f'<div class="section-kicker">{t(kicker)}</div><div class="section-title">{t(title)}</div>', unsafe_allow_html=True)
-    if desc:
-        st.markdown(f'<div class="section-desc">{t(desc)}</div>', unsafe_allow_html=True)
+    desc_html = f'<div class="section-desc">{t(desc)}</div>' if desc else ""
+    st.markdown(
+        f'<div class="section-block"><div class="section-kicker">{t(kicker)}</div>'
+        f'<div class="section-title">{t(title)}</div>{desc_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def escape_markdown_dollars(content: str) -> str:
