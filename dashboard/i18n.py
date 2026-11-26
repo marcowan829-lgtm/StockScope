@@ -116,11 +116,12 @@ def language_css() -> str:
   }}
   div.st-key-lang_pills {{ min-width: 5.5rem; }}
   div.st-key-lang_pills [data-testid="stButtonGroup"] {{
-    background: #f0f3fa;
+    background: #ffffff;
     border: 1px solid #e0e3eb;
     border-radius: 999px;
     padding: 2px;
     gap: 0;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
   }}
   div.st-key-lang_pills button {{
     min-height: 1.85rem !important;

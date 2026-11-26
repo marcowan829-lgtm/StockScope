@@ -157,20 +157,58 @@ COMPANY_NAMES = {
 APP_STYLE = """
 <style>
   html, body, [data-testid="stAppViewContainer"], .stApp {
-    background: #ffffff;
+    background: #f5f7fa;
     color: #131722;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang HK", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Trebuchet MS", Roboto, Ubuntu, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .stApp::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #131722;
+    z-index: 999;
+    pointer-events: none;
   }
   [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] { display: none !important; }
   header[data-testid="stHeader"] { display: none !important; }
   div[data-testid="stDecoration"], div[data-testid="stToolbar"] { display: none !important; }
   .stAppDeployButton, #MainMenu, footer { display: none !important; }
-  .block-container { padding-top: 1rem; padding-bottom: 2.2rem; max-width: 1440px; }
+  .block-container { padding-top: 1.15rem; padding-bottom: 2.2rem; max-width: 1440px; }
   div[data-testid="stMetric"] {
-    background: #fff;
+    background: #ffffff;
     border: 1px solid #e0e3eb;
     padding: 0.85rem 1rem;
     border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
+  }
+  div[class*="st-key-idx_card_"] {
+    background: #ffffff !important;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
+  }
+  [data-testid="stDataFrame"] {
+    background: #ffffff;
+    border: 1px solid #e0e3eb;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
+  }
+  [data-testid="stAlert"] {
+    background: #ffffff;
+    border: 1px solid #e0e3eb;
+    border-radius: 10px;
+  }
+  [data-testid="stPlotlyChart"] {
+    background: #ffffff;
+    border: 1px solid #e0e3eb;
+    border-radius: 12px;
+    padding: 0.2rem 0.15rem 0.05rem;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
+  }
+  div.st-key-nav_pills button:hover {
+    border-color: #b2b5be !important;
+    background: #ffffff !important;
   }
   .topnav {
     display: flex;
@@ -205,8 +243,9 @@ APP_STYLE = """
     border: 1px solid #e0e3eb;
     border-radius: 12px;
     padding: 0.9rem 1rem 0.85rem 1rem;
-    background: #fff;
+    background: #ffffff;
     min-height: 118px;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
   }
   .index-card-top { display: flex; align-items: flex-start; gap: 0.7rem; }
   .idx-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
@@ -219,12 +258,14 @@ APP_STYLE = """
     background: #131722; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #c8ccd6;
   }
   .stat-chip {
-    border: 1px solid #e0e3eb; border-radius: 10px; padding: 0.65rem 0.75rem; background: #fff;
+    border: 1px solid #e0e3eb; border-radius: 10px; padding: 0.65rem 0.75rem; background: #ffffff;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.03);
   }
   .stat-chip .k { color: #6a6d78; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
   .stat-chip .v { font-weight: 700; font-size: 1.02rem; font-variant-numeric: tabular-nums; margin-top: 0.15rem; }
   .about-box {
-    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #f7f8fa;
+    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #ffffff;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
   }
   .idx-badge {
     width: 36px; height: 36px; border-radius: 50%;
@@ -255,7 +296,8 @@ APP_STYLE = """
     text-transform: uppercase; margin: 0.35rem 0 0.2rem 0;
   }
   .learn-card {
-    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #f7f8fa;
+    border: 1px solid #e0e3eb; border-radius: 12px; padding: 1rem 1.1rem; background: #ffffff;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
   }
   .learn-card h3 { margin: 0 0 0.4rem 0; font-size: 1.02rem; }
   .learn-card p, .learn-card li { color: #4c4f59; font-size: 0.92rem; }
@@ -263,11 +305,21 @@ APP_STYLE = """
   div.st-key-nav_pills button { white-space: nowrap; padding: 0.4rem 0.65rem; min-height: 2.5rem; }
   div.st-key-nav_search [data-testid="stTextInputRootElement"] {
     border-radius: 24px;
-    background: #f0f3fa;
+    background: #ffffff;
     border: 1px solid #e0e3eb;
+    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
   }
   div.st-key-nav_search input { background: transparent; }
-  .nav-rule { border: 0; border-top: 1px solid #e0e3eb; margin: 0.1rem 0 0.85rem 0; }
+  .nav-rule { border: 0; border-top: 1px solid #d8dbe3; margin: 0.15rem 0 1rem 0; }
+  .site-footer {
+    margin-top: 0.35rem;
+    padding: 0.85rem 0 0.15rem;
+    border-top: 1px solid #d8dbe3;
+    color: #787b86;
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
+    line-height: 1.55;
+  }
   .chart-help-title { font-size: 1rem; font-weight: 700; line-height: 1.45; margin: 0; color: #131722; }
   div[class*="st-key-chart_help_"] button {
     border-radius: 50% !important; width: 2.2rem !important; height: 2.2rem !important;
@@ -1261,7 +1313,7 @@ def render_index_cards(snap: pd.DataFrame) -> None:
     for col, ticker in zip(cols, INDEX_ORDER):
         meta = INDEX_META[ticker]
         with col:
-            with st.container(border=True):
+            with st.container(border=True, key=widget_key("idx_card", ticker)):
                 info, plus_col, open_col = st.columns([4.15, 0.55, 0.55])
                 with info:
                     st.markdown(index_card_title_html(ticker), unsafe_allow_html=True)
@@ -2436,9 +2488,8 @@ def main() -> None:
 
     render_study_launcher()
 
-    st.markdown("---")
     st.markdown(
-        f"<div class='small-note'>{t('StockScope · classroom prototype · verify definitions and data rights yourself. This tool is not investment advice.')}</div>",
+        f"<div class='site-footer'>{t('StockScope · classroom prototype · verify definitions and data rights yourself. This tool is not investment advice.')}</div>",
         unsafe_allow_html=True,
     )
 

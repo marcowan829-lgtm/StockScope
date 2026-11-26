@@ -2,7 +2,7 @@
 @SCOPE@ {
   --ink:#131722; --muted:#6a6d78; --panel:#fff; --panel-2:#fff;
   --line:#e0e3eb; --mint:#087f6d; --blue:#2962ff; --amber:#946200; --rose:#c63845;
-  color:var(--ink); background:#fff; min-width:0;
+  color:var(--ink); background:#f5f7fa; min-width:0;
   font-family:-apple-system,BlinkMacSystemFont,"PingFang HK","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
 }
 @SCOPE@ h1, @SCOPE@ h2, @SCOPE@ h3, @SCOPE@ h4,
@@ -40,7 +40,7 @@
 @SCOPE@ [data-testid="stPlotlyChart"] {width:100%;max-width:100%;min-width:0;}
 @SCOPE@ [data-testid="stPlotlyChart"] > div {min-width:0;max-width:100%;}
 @SCOPE@ [data-testid="stAlert"] {background:#fff;border:1px solid var(--line);border-left:3px solid #2962ff;}
-@SCOPE@ .hero {background:#fff;border:1px solid var(--line);border-radius:18px;padding:1.6rem;margin-bottom:1.2rem;}
+@SCOPE@ .hero {background:#fff;border:1px solid var(--line);border-radius:18px;padding:1.6rem;margin-bottom:1.2rem;box-shadow:0 1px 2px rgba(19,23,34,.04);}
 @SCOPE@ .hero h1 {font-size:clamp(1.8rem,2.6vw,2.65rem);line-height:1.15;margin:.5rem 0 1rem;}
 @SCOPE@ .hero p {color:var(--muted);font-size:1rem;line-height:1.7;margin-bottom:0;}
 @SCOPE@ .eyebrow, @SCOPE@ .section-kicker {color:#087f6d;font-size:.8rem;font-weight:750;letter-spacing:.12em;text-transform:uppercase;}
@@ -48,6 +48,7 @@
 @SCOPE@ .section-desc {color:var(--muted);line-height:1.6;margin-bottom:1.2rem;}
 @SCOPE@ .lesson-card, @SCOPE@ .info-card, @SCOPE@ .cycle-card, @SCOPE@ .statement-nav-card {
   background:#fff;border:1px solid var(--line);border-radius:14px;padding:1rem;height:100%;
+  box-shadow:0 1px 2px rgba(19,23,34,.04);
 }
 @SCOPE@ .statement-nav-card {margin-bottom:.7rem;}
 @SCOPE@ .statement-nav-card.is-active {background:#fff;border-color:#131722;}

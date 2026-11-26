@@ -71,7 +71,7 @@ def test_add_duplicate_and_remove_watchlist_symbol():
     page.button(key="wl_add_btn").click().run()
     assert_clean(page)
     assert page.session_state["watchlist"].count("NVDA") == 1
-    page.selectbox(key="wl_remove_choice").select("NVDA").run()
+    page.selectbox(key="wl_remove_choice__en").select("NVDA").run()
     page.button(key="wl_remove_btn").click().run()
     assert_clean(page)
     assert page.session_state["watchlist"] == ["AAPL", "MCD"]

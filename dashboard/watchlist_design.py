@@ -13,7 +13,7 @@ FALLBACK_COLORS = ["#2962ff", "#7c3aed", "#087f8c", "#a43b57", "#926417", "#3454
 FUND_SYMBOLS = {"SPY", "QQQ", "DIA"}
 
 WATCHLIST_STYLE = """<style>
-  .st-key-watchlist_panel {--watchlist-row-height:76px;background:#fff;border:1px solid #e0e3eb;border-radius:18px;padding:.9rem;gap:.6rem;}
+  .st-key-watchlist_panel {--watchlist-row-height:76px;background:#fff;border:1px solid #e0e3eb;border-radius:18px;padding:.9rem;gap:.6rem;box-shadow:0 1px 2px rgba(19,23,34,.04);}
   .watchlist-heading {font-size:1.12rem;font-weight:750;letter-spacing:-.025em;margin:0;color:#131722;}
   .watchlist-summary {font-size:.8rem;line-height:1.4;color:#787b86;margin:.2rem 0 0;}
   .watchlist-group-title {display:flex;align-items:center;justify-content:space-between;color:#787b86;font-size:.75rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin:.6rem .1rem .15rem;}
