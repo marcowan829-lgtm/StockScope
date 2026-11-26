@@ -1220,6 +1220,7 @@ ZH.update({
     "Returns may come from price changes and dividends. Risks include falling prices, a weakening business, limited liquidity and concentrated holdings.":
         "回報可來自價格變動及股息。風險包括價格下跌、業務轉弱、流動性有限及持倉過於集中。",
     "Investment judgement": "投資判斷",
+    "Lesson sections": "課堂章節",
     "01 What a share represents": "01 股份代表甚麼",
     "02 How markets work": "02 市場如何運作",
     "03 Common investment products": "03 常見投資產品",

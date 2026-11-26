@@ -1818,15 +1818,28 @@ elif chosen_page == '01 Stock Market Basics':
     with overview_cols[2]:
         info_card("⚖️", 'Returns and risk', 'Returns may come from price changes and dividends. Risks include falling prices, a weakening business, limited liquidity and concentrated holdings.', 'Investment judgement')
 
-    lesson_tabs = st.tabs([
-        t('01 What a share represents'),
-        t('02 How markets work'),
-        t('03 Common investment products'),
-        t('04 Prices and returns'),
-        t('05 Risk and getting started'),
-    ])
+    lesson1_sections = [
+        '01 What a share represents',
+        '02 How markets work',
+        '03 Common investment products',
+        '04 Prices and returns',
+        '05 Risk and getting started',
+    ]
+    with st.container(key="lesson1_section_nav"):
+        lesson_section = st.pills(
+            t("Lesson sections"),
+            options=lesson1_sections,
+            default=lesson1_sections[0],
+            required=True,
+            selection_mode="single",
+            wrap=True,
+            key=lang_key("lesson1_section"),
+            format_func=t,
+            label_visibility="collapsed",
+            width="content",
+        )
 
-    with lesson_tabs[0]:
+    if lesson_section == lesson1_sections[0]:
         section_heading("OWNERSHIP", "A share is part of a company's ownership", 'It is not a debt promise or a fixed-income product.')
         st.markdown(
             """Owning shares means owning part of a company's equity. Common shareholders may have voting rights and receive dividends; rights depend on share class, company documents and local rules. Dividends and price gains are not guaranteed.
@@ -1874,7 +1887,7 @@ Returns and risks depend on the business, finances, competition, expectations an
 - **Valuation:** also requires future cash flow, growth, competitive advantages, financial position and risk. Market cap alone does not tell you whether a stock is cheap."""
             )
 
-    with lesson_tabs[1]:
+    if lesson_section == lesson1_sections[1]:
         section_heading("MARKET STRUCTURE", 'From issuing shares to completing a trade', 'Separate issuers, investors, brokers, trading venues and regulators.')
         st.markdown(
             """**Primary market: issuing securities to raise capital.** An IPO or later share offering can raise money through newly issued shares. Structures and rules differ by market.
@@ -1899,7 +1912,7 @@ Execution depends on broker arrangements, market structure, order type and liqui
                 'Investors need verifiable information. US filings commonly include annual reports (10-K), quarterly reports (10-Q) and current reports (8-K). Other markets have different rules. Financial statements, announcements and risk factors connect market stories with company research.'
             )
 
-    with lesson_tabs[2]:
+    if lesson_section == lesson1_sections[2]:
         section_heading("INVESTMENT VEHICLES", 'Stocks, bonds, indices and ETFs are different', 'Understand what you own before comparing price and risk.')
         tool_table = pd.DataFrame([
             {'Product': 'Stock', 'What you own': "Part of a company's equity", 'Possible returns': 'Price changes and possible dividends', 'Risks to understand': 'Business, valuation and market-price risk'},
@@ -1920,7 +1933,7 @@ Execution depends on broker arrangements, market structure, order type and liqui
 - **Bull and bear markets:** describe broader trends, not a conclusion from one day's move."""
             )
 
-    with lesson_tabs[3]:
+    if lesson_section == lesson1_sections[3]:
         section_heading("PRICE & RETURN", 'Price is a trading outcome; return has several components', 'A market price reflects transactions and expectations at a moment in time, not a direct reading of intrinsic value.')
         st.markdown(
             """- **Bid:** a buyer's quoted price; the best bid is the highest available bid.
@@ -1966,7 +1979,7 @@ Orders, company news, industries, interest rates, the economy, sentiment and liq
                 'A **market order** prioritises prompt execution without guaranteeing price. A **limit order** sets an acceptable price or better, but may not fill. A **stop order** generally becomes a market order when triggered, so its trigger is not a guaranteed execution price. Broker and market rules vary; the next lesson explores execution.'
             )
 
-    with lesson_tabs[4]:
+    if lesson_section == lesson1_sections[4]:
         section_heading("RISK & READINESS", 'Set boundaries before choosing products', 'Risk includes timing, costs, liquidity and behaviour as well as price movement.')
         readiness = st.columns(2)
         with readiness[0]:

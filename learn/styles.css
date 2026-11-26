@@ -37,6 +37,55 @@
 @SCOPE@ [role="tablist"] {gap:.4rem;}
 @SCOPE@ [role="tab"] {background:#fff;color:var(--muted);white-space:normal;}
 @SCOPE@ [role="tab"][aria-selected="true"] {background:#fff;color:var(--ink);border-bottom-color:#131722;}
+@SCOPE@ .st-key-lesson1_section_nav {
+  margin-top:1.85rem;
+  padding-top:0.9rem;
+  border-top:1px solid #d5dae3;
+}
+@SCOPE@ .st-key-lesson1_section_nav [data-testid="stButtonGroup"] {
+  background:transparent;
+  border:0;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-start;
+  align-items:flex-end;
+  gap:0.15rem 1.15rem;
+  width:100%;
+}
+@SCOPE@ .st-key-lesson1_section_nav button {
+  background:transparent !important;
+  border:0 !important;
+  border-bottom:2px solid transparent !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  color:#6a6d78 !important;
+  white-space:nowrap !important;
+  width:auto !important;
+  flex:0 0 auto !important;
+  height:auto !important;
+  min-height:2.35rem !important;
+  line-height:1.35 !important;
+  padding:0.25rem 0.05rem 0.45rem !important;
+}
+@SCOPE@ .st-key-lesson1_section_nav button p {
+  white-space:nowrap !important;
+  overflow:visible !important;
+  text-overflow:unset !important;
+  text-align:left !important;
+}
+@SCOPE@ .st-key-lesson1_section_nav button:hover {
+  background:transparent !important;
+  color:#131722 !important;
+  border-color:transparent !important;
+  border-bottom-color:#b2b5be !important;
+}
+@SCOPE@ .st-key-lesson1_section_nav button[kind="primary"],
+@SCOPE@ .st-key-lesson1_section_nav button[aria-pressed="true"],
+@SCOPE@ .st-key-lesson1_section_nav button[aria-checked="true"] {
+  background:transparent !important;
+  color:#131722 !important;
+  border-bottom-color:#131722 !important;
+}
 @SCOPE@ [data-testid="stPlotlyChart"] {width:100%;max-width:100%;min-width:0;}
 @SCOPE@ [data-testid="stPlotlyChart"] > div {min-width:0;max-width:100%;}
 @SCOPE@ [data-testid="stAlert"] {background:#fff;border:1px solid var(--line);border-left:3px solid #2962ff;}
