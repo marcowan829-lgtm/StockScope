@@ -1,0 +1,8 @@
+---
+description: Push every git commit to GitHub
+alwaysApply: true
+---
+
+# Push after every commit
+
+Whenever you create a git commit in this repository, also `git push` to the tracked `origin` branch. The user wants every committed change uploaded to GitHub without a separate request.
