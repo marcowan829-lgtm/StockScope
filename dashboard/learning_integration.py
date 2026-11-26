@@ -3,7 +3,7 @@ from pathlib import Path
 import runpy
 
 import streamlit as st
-from i18n import is_zh, t
+from i18n import t
 
 
 COURSE_PAGES = [
@@ -37,38 +37,14 @@ def return_to_markets() -> None:
 
 @st.dialog("Your study path", position="right", width="small")
 def show_study_path() -> None:
-    dialog_title_css = ""
-    if is_zh():
-        dialog_title_css = (
-            '[data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] h2'
-            "{font-size:0!important;line-height:0;}"
-            '[data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] h2::after'
-            f'{{content:"{t("Your study path")}";font-size:1.45rem;line-height:1.3;'
-            "color:#131722;display:block;font-weight:700;letter-spacing:-0.02em;}"
-        )
-    st.markdown('''<span class="study-path-marker"></span><style>
-      ''' + dialog_title_css + '''
-      [data-testid="stDialog"]:has(.study-path-marker) {background:transparent!important;}
-      [data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] { background:#fff; color:#131722; }
-      [data-testid="stDialog"]:has(.study-path-marker) h2,
-      [data-testid="stDialog"]:has(.study-path-marker) p,
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stCaptionContainer"] { color:#131722; }
-      [data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] > button { color:#131722; }
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button {
-        width:100%; min-height:3rem; justify-content:flex-start; text-align:left;
-        background:#fff; color:#131722; border:1px solid #e0e3eb; border-radius:13px;
-      }
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button:hover { border-color:#131722; background:#fff; }
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button > div {width:100%;justify-content:flex-start;}
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button [data-testid="stMarkdownContainer"] {width:100%;text-align:left;}
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button p {font-size:1rem;line-height:1.4;text-align:left;}
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stProgressBarTrack"] {background:#e0e3eb;}
-      [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stProgressBarTrack"] > div {background:#087f6d;}
-      .study-path-brand {display:flex;gap:14px;align-items:center;margin:.25rem 0 1.2rem;}
-      .study-path-logo {display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:#fff;border:1px solid #e0e3eb;color:#131722;font-size:26px;font-weight:800;}
-      .study-path-brand b {color:#131722;font-size:1.2rem;}
-      .study-path-brand small {display:block;color:#6a6d78;margin-top:5px;}
-    </style><div class="study-path-brand"><span class="study-path-logo">S</span><div><b>StockScope Learn</b><small>''' + t("Build your market knowledge, one lesson at a time.") + '''</small></div></div>''', unsafe_allow_html=True)
+    st.markdown(
+        '<span class="study-path-marker"></span>'
+        '<div class="study-path-brand"><span class="study-path-logo">S</span>'
+        "<div><b>StockScope Learn</b><small>"
+        + t("Build your market knowledge, one lesson at a time.")
+        + "</small></div></div>",
+        unsafe_allow_html=True,
+    )
     completed = set(st.session_state.get("completed_lessons", []))
     done = sum(name in completed for _, name, _ in COURSE_PAGES[1:9])
     st.progress(done / 8, text=t("{done} of 8 lessons completed", done=done))

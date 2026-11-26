@@ -362,6 +362,28 @@ APP_STYLE = """
     .hero-title { font-size: 1.4rem; }
     .block-container { padding-left: 0.8rem; padding-right: 0.8rem; }
   }
+  [data-testid="stDialog"]:has(.study-path-marker) { background: transparent !important; }
+  [data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] { background: #fff; color: #131722; }
+  [data-testid="stDialog"]:has(.study-path-marker) h2,
+  [data-testid="stDialog"]:has(.study-path-marker) p,
+  [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stCaptionContainer"] { color: #131722; }
+  [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button {
+    width: 100%; min-height: 3rem; justify-content: flex-start; text-align: left;
+    background: #fff; color: #131722; border: 1px solid #e0e3eb; border-radius: 13px;
+  }
+  [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button:hover {
+    border-color: #131722; background: #fff;
+  }
+  [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button div { width: 100%; justify-content: flex-start; }
+  [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stButton"] button p { font-size: 1rem; line-height: 1.4; text-align: left; }
+  [data-testid="stDialog"]:has(.study-path-marker) [data-testid="stProgressBarTrack"] { background: #e0e3eb; }
+  .study-path-brand { display: flex; gap: 14px; align-items: center; margin: 0.25rem 0 1.2rem; }
+  .study-path-logo {
+    display: grid; place-items: center; width: 48px; height: 48px; border-radius: 15px;
+    background: #fff; border: 1px solid #e0e3eb; color: #131722; font-size: 26px; font-weight: 800;
+  }
+  .study-path-brand b { color: #131722; font-size: 1.2rem; }
+  .study-path-brand small { display: block; color: #6a6d78; margin-top: 5px; }
 </style>
 """
 

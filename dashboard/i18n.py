@@ -108,6 +108,16 @@ def language_css() -> str:
         extra = """
   .watchlist-group-title { text-transform: none; letter-spacing: 0.02em; font-size: 0.82rem; }
   div.st-key-nav_pills [data-testid="stMarkdownContainer"] p { font-size: 0.88rem; }
+  [data-testid="stDialog"]:has(.chart-guide-marker) [role="dialog"] h2 {font-size:0!important;line-height:0;}
+  [data-testid="stDialog"]:has(.chart-guide-marker) [role="dialog"] h2::after {
+    content:"如何閱讀此圖表";font-size:1.45rem;line-height:1.3;color:#131722;
+    display:block;font-weight:700;letter-spacing:-0.02em;
+  }
+  [data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] h2 {font-size:0!important;line-height:0;}
+  [data-testid="stDialog"]:has(.study-path-marker) [role="dialog"] h2::after {
+    content:"你的學習路徑";font-size:1.45rem;line-height:1.3;color:#131722;
+    display:block;font-weight:700;letter-spacing:-0.02em;
+  }
 """
     return f"""
 <style>

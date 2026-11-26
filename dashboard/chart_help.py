@@ -4,7 +4,7 @@ import html
 import plotly.graph_objects as go
 import streamlit as st
 from chart_examples import EXAMPLE_SUMMARIES, annotated_example
-from i18n import is_zh, t
+from i18n import t
 from learning_integration import open_lesson
 
 
@@ -197,19 +197,7 @@ def _plain_markdown(text: str) -> str:
 
 @st.dialog("How to read this chart", position="right", width="small")
 def show_chart_guide(topic: str) -> None:
-    dialog_title_css = ""
-    if is_zh():
-        dialog_title_css = (
-            '[data-testid="stDialog"]:has(.chart-guide-marker) [role="dialog"] h2'
-            "{font-size:0!important;line-height:0;}"
-            '[data-testid="stDialog"]:has(.chart-guide-marker) [role="dialog"] h2::after'
-            f'{{content:"{t("How to read this chart")}";font-size:1.45rem;line-height:1.3;'
-            "color:#131722;display:block;font-weight:700;letter-spacing:-0.02em;}"
-        )
-    st.markdown(
-        f'<span class="chart-guide-marker"></span><style>{dialog_title_css}</style>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<span class="chart-guide-marker"></span>', unsafe_allow_html=True)
     guide = CHART_GUIDES[topic]
     st.subheader(t(guide["title"]))
     st.caption(t("MADE-UP EXAMPLE · Follow the drawing notes: 1 → 2 → 3."))
