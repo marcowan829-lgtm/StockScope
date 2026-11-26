@@ -413,7 +413,7 @@ def dual_signal_figure(
             bgcolor="#ffffff", bordercolor="#8ba2bd", borderwidth=1.5,
         ),
         barmode="overlay", xaxis_rangeslider_visible=False,
-        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        paper_bgcolor="#f5f7fa", plot_bgcolor="#f5f7fa",
         font=dict(color="#131722", family=plotly_font(), size=13),
         hoverlabel=dict(bgcolor="#ffffff", font_color="#131722", font_size=13, bordercolor="#8ba2bd"),
     )
@@ -621,12 +621,12 @@ def render_final_answer_review(number: int, question: str, options: list[str], s
 def style_fig(fig: go.Figure, height: int = 430) -> go.Figure:
     fig.update_layout(
         template="plotly_white",
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
+        paper_bgcolor="#f5f7fa",
+        plot_bgcolor="#f5f7fa",
         font=dict(color="#131722", family=plotly_font(), size=13),
         height=height,
         margin=dict(l=8, r=8, t=56, b=12),
-        legend=dict(bgcolor="#ffffff", orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        legend=dict(bgcolor="rgba(0,0,0,0)", orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         hoverlabel=dict(bgcolor="#ffffff", font_color="#131722", font_size=13, font_family=plotly_font()),
     )
     fig.update_xaxes(showgrid=False, zeroline=False, linecolor="rgba(180,204,232,.16)")

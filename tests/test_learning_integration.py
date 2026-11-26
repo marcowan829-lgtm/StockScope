@@ -114,11 +114,11 @@ def test_completing_a_lesson_updates_the_popup_progress():
     assert app.button(key="study_lesson_1").label.startswith("✓")
 
 
-def test_learning_chart_uses_white_surfaces(learn):
+def test_learning_chart_uses_canvas_surfaces(learn):
     import plotly.graph_objects as go
     figure = learn.style_fig(go.Figure())
-    assert figure.layout.paper_bgcolor == "#ffffff"
-    assert figure.layout.plot_bgcolor == "#ffffff"
+    assert figure.layout.paper_bgcolor == "#f5f7fa"
+    assert figure.layout.plot_bgcolor == "#f5f7fa"
     assert figure.layout.font.color == "#131722"
     assert figure.layout.hoverlabel.bgcolor == "#ffffff"
 

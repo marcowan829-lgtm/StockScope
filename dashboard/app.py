@@ -33,6 +33,7 @@ LEARN_TABS = ["Start here", "Data & methods"]
 UP_COLOR = "#089981"
 DOWN_COLOR = "#f23645"
 PREV_CLOSE_COLOR = "#787b86"
+CANVAS = "#f5f7fa"
 GRID_COLOR = "#f0f3fa"
 SPIKE_COLOR = "#9598a1"
 
@@ -200,11 +201,15 @@ APP_STYLE = """
     border-radius: 10px;
   }
   [data-testid="stPlotlyChart"] {
-    background: #ffffff;
-    border: 1px solid #e0e3eb;
-    border-radius: 12px;
-    padding: 0.2rem 0.15rem 0.05rem;
-    box-shadow: 0 1px 2px rgba(19, 23, 34, 0.04);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  [data-testid="stPlotlyChart"] iframe {
+    border: 0 !important;
+    background: transparent !important;
   }
   div.st-key-nav_pills button:hover {
     border-color: #b2b5be !important;
@@ -678,8 +683,8 @@ def make_monthly_sector_heatmap(prices: pd.DataFrame) -> go.Figure | None:
         yaxis_title=t("Group"),
         height=420,
         margin=dict(l=10, r=10, t=60, b=10),
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
+        paper_bgcolor=CANVAS,
+        plot_bgcolor=CANVAS,
     )
     return fig
 
@@ -765,8 +770,8 @@ def apply_market_layout(
     fig.update_layout(
         height=height,
         margin=dict(l=8, r=64, t=8, b=28),
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
+        paper_bgcolor=CANVAS,
+        plot_bgcolor=CANVAS,
         hovermode="x unified",
         showlegend=False,
         font=dict(color="#131722", size=12, family=plotly_font()),
@@ -778,7 +783,7 @@ def apply_market_layout(
         showgrid=True,
         gridcolor=GRID_COLOR,
         zeroline=False,
-        linecolor="#ffffff",
+        linecolor=CANVAS,
         tickfont=dict(color="#6a6d78", size=11),
         separatethousands=True,
         showspikes=True,
@@ -1000,7 +1005,7 @@ def signed_hbar(df: pd.DataFrame, x_col: str, y_col: str, title: str, x_title: s
         title=title, height=400, showlegend=False,
         xaxis_title=x_title, yaxis_title="",
         margin=dict(l=8, r=12, t=48, b=8),
-        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        paper_bgcolor=CANVAS, plot_bgcolor=CANVAS,
         font=dict(color="#131722", size=12),
         bargap=0.28,
     )
@@ -1665,7 +1670,7 @@ def render_index_page() -> None:
                     ))
                 fig_cmp.update_layout(
                     height=260, margin=dict(l=8, r=12, t=8, b=8),
-                    paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+                    paper_bgcolor=CANVAS, plot_bgcolor=CANVAS,
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
                     hovermode="x unified",
                     yaxis_title=t("Start = 100"),
@@ -1963,7 +1968,7 @@ def render_overview(
             title=t("Highest volume in the latest session"),
             height=410, xaxis_title=t("Shares"), yaxis_title="",
             margin=dict(l=8, r=12, t=48, b=8),
-            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+            paper_bgcolor=CANVAS, plot_bgcolor=CANVAS,
             showlegend=False,
         )
         fig_volume_rank.update_xaxes(tickformat="~s", gridcolor=GRID_COLOR)
@@ -2079,7 +2084,7 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
         height=470, hovermode="x unified",
         yaxis_title=t("Rebased level (start of window = 100)"),
         xaxis_title=t("Date"),
-        paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+        paper_bgcolor=CANVAS, plot_bgcolor=CANVAS,
         legend_title_text=t("Ticker"),
     )
     fig_line.update_xaxes(showgrid=False)
@@ -2097,7 +2102,7 @@ def render_risk(prices: pd.DataFrame, metrics: pd.DataFrame, period: str) -> Non
         fig_scatter.add_hline(y=0, line_dash="dot", line_color=PREV_CLOSE_COLOR, line_width=1)
         fig_scatter.update_layout(
             height=450, xaxis_title=t("Ann. volatility (%)"), yaxis_title=t("Period return (%)"),
-            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+            paper_bgcolor=CANVAS, plot_bgcolor=CANVAS,
         )
         fig_scatter.update_xaxes(gridcolor=GRID_COLOR)
         fig_scatter.update_yaxes(gridcolor=GRID_COLOR, zeroline=True, zerolinecolor="#b2b5be")
