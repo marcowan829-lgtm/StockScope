@@ -151,12 +151,12 @@ def test_financial_statement_and_metric_controls():
     for i in range(3):
         app.button(key=f"statement_nav_{i}").click().run()
         assert_clean(app)
-    app.radio(key="company_research_section").set_value('02 · Ratio Translator').run()
+    app.pills(key="company_research_section__en").set_value('02 · Ratio Translator').run()
     for option in app.selectbox(key="company_metric_translator").options:
         app.selectbox(key="company_metric_translator").select(option).run()
         assert_clean(app)
     for section in ['03 · Company Detective', '04 · Research a Real Company']:
-        app.radio(key="company_research_section").set_value(section).run()
+        app.pills(key="company_research_section__en").set_value(section).run()
         assert_clean(app)
 
 

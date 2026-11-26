@@ -981,6 +981,23 @@ def content_heading(title: str, *, level: str = "h4") -> None:
     st.markdown(f'<div class="{cls}">{t(title)}</div>', unsafe_allow_html=True)
 
 
+def line_nav(options: list[str], *, key: str, default: str | None = None, label: str = "Lesson sections") -> str:
+    with st.container(key=f"line_nav_{key}"):
+        selected = st.pills(
+            t(label),
+            options=options,
+            default=default or options[0],
+            required=True,
+            selection_mode="single",
+            wrap=True,
+            key=lang_key(key),
+            format_func=t,
+            label_visibility="collapsed",
+            width="content",
+        )
+    return selected or default or options[0]
+
+
 def escape_markdown_dollars(content: str) -> str:
     """Keep dollar-denominated values literal instead of treating $ as LaTeX delimiters."""
     return str(content).replace("$", "&#36;")
@@ -1833,19 +1850,7 @@ elif chosen_page == '01 Stock Market Basics':
         '04 Prices and returns',
         '05 Risk and getting started',
     ]
-    with st.container(key="lesson1_section_nav"):
-        lesson_section = st.pills(
-            t("Lesson sections"),
-            options=lesson1_sections,
-            default=lesson1_sections[0],
-            required=True,
-            selection_mode="single",
-            wrap=True,
-            key=lang_key("lesson1_section"),
-            format_func=t,
-            label_visibility="collapsed",
-            width="content",
-        )
+    lesson_section = line_nav(lesson1_sections, key="lesson1_section")
 
     if lesson_section == lesson1_sections[0]:
         section_heading("OWNERSHIP", "A share is part of a company's ownership", 'It is not a debt promise or a fixed-income product.')
@@ -2503,14 +2508,15 @@ elif chosen_page == '03 How Orders Work':
         st.markdown(f'<div class="step-line"><div class="step-num">{num}</div><div class="step-body"><b>{title}</b><br>{body}</div></div>', unsafe_allow_html=True)
 
     section_heading("ORDER TYPES", 'How do three common order types differ?')
-    order_tabs = st.tabs([t('Market order'), t('Limit order'), t('Stop order')])
-    with order_tabs[0]:
+    order_types = ['Market order', 'Limit order', 'Stop order']
+    selected_order = line_nav(order_types, key="order_types")
+    if selected_order == 'Market order':
         st.markdown("""
 A **market order** aims to buy or sell promptly at the best available market price. It puts more emphasis on execution than on a fixed price.
 
 **Remember:** The last traded price is not a promised fill price. Prices can move before execution, and a less liquid market may fill parts of an order at different prices.
 """)
-    with order_tabs[1]:
+    elif selected_order == 'Limit order':
         st.markdown("""
 A **limit order** sets the highest price you will pay to buy or the lowest price you will accept to sell.
 
@@ -2519,7 +2525,7 @@ A **limit order** sets the highest price you will pay to buy or the lowest price
 
 Controlling price does not guarantee execution.
 """)
-    with order_tabs[2]:
+    else:
         st.markdown("""
 A **stop order** usually becomes a market order when its trigger condition is met. The actual fill can differ from the stop price.
 
@@ -2579,15 +2585,13 @@ elif chosen_page == '04 Researching a Company':
     st.markdown('**Start with a business question, then find financial evidence.**')
     st.write('Use fictional Orange Grove Drinks to explore statements, ratios and case studies, then apply the method to a real company.')
 
-    # Use a stateful selector instead of st.tabs here. The chart controls below
-    # trigger reruns; a keyed widget guarantees the selected lesson section persists.
-    lesson_section = st.radio(
-        'In this lesson',
-        ['01 · Financial Statements', '02 · Ratio Translator', '03 · Company Detective', '04 · Research a Real Company'],
-        key="company_research_section",
-        horizontal=True,
-        label_visibility="collapsed",
-    )
+    company_sections = [
+        '01 · Financial Statements',
+        '02 · Ratio Translator',
+        '03 · Company Detective',
+        '04 · Research a Real Company',
+    ]
+    lesson_section = line_nav(company_sections, key="company_research_section")
 
     # --- Tab 2: statements as three different views ---
     if lesson_section == '01 · Financial Statements':
