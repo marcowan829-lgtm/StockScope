@@ -84,12 +84,8 @@
   padding-top:0.9rem;
   border-top:1px solid #d5dae3;
 }
-@SCOPE@ [data-testid="stPlotlyChart"] {
-  width:100%;max-width:100%;min-width:0;
-  background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;
-}
+@SCOPE@ [data-testid="stPlotlyChart"] {width:100%;max-width:100%;min-width:0;}
 @SCOPE@ [data-testid="stPlotlyChart"] > div {min-width:0;max-width:100%;}
-@SCOPE@ [data-testid="stPlotlyChart"] iframe {border:0 !important;background:transparent !important;}
 @SCOPE@ [data-testid="stAlert"] {background:#fff;border:1px solid var(--line);border-left:3px solid #2962ff;}
 @SCOPE@ .hero {background:transparent;border:0;border-radius:0;padding:0.15rem 0 0.85rem;margin-bottom:1.1rem;box-shadow:none;}
 @SCOPE@ .hero h1 {font-size:clamp(1.8rem,2.6vw,2.65rem);line-height:1.15;margin:.5rem 0 1rem;}
