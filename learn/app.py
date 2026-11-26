@@ -575,7 +575,7 @@ Plotting a cloud ahead does not mean it knows future prices: it shifts already c
         return
 
     title, lesson_markdown = lessons[choice]
-    st.markdown(f"#### {title}")
+    content_heading(title)
     st.markdown(lesson_markdown)
 
 
@@ -974,6 +974,11 @@ def section_heading(kicker: str, title: str, desc: str | None = None) -> None:
         f'<div class="section-title">{t(title)}</div>{desc_html}</div>',
         unsafe_allow_html=True,
     )
+
+
+def content_heading(title: str, *, level: str = "h4") -> None:
+    cls = "content-h3" if level == "h3" else "content-h4"
+    st.markdown(f'<div class="{cls}">{t(title)}</div>', unsafe_allow_html=True)
 
 
 def escape_markdown_dollars(content: str) -> str:
@@ -1704,7 +1709,7 @@ if chosen_page == 'Learning Home':
                         )
                     with answer_col:
                         with st.container(border=True):
-                            st.markdown(f'### {t("Your judgement")}')
+                            content_heading("Your judgement", level="h3")
                             st.markdown(
                                 f'Study the prices through **{signal_date:%Y-%m-%d}** on the left. Consider prices relative to the averages, volume, and both MACD lines and the histogram.'
                             )
@@ -2045,7 +2050,7 @@ elif chosen_page == '02 Reading Stock Charts':
             st.session_state[chart_period_key] = "3mo"
         lesson_period = st.selectbox(t('History window'), ["1mo", "3mo", "6mo", "1y"], index=1, format_func=lambda x: t(PERIODS[x]), key=chart_period_key)
         st.markdown('<div class="callout">Start with three months. Hover over candles and inspect the OHLC values one by one.</div>', unsafe_allow_html=True)
-        st.markdown('#### Five chart essentials')
+        content_heading('Five chart essentials')
         st.markdown("""**Open:** price at the start of the bar.
 
 **High:** highest price during it.
@@ -2068,7 +2073,7 @@ elif chosen_page == '02 Reading Stock Charts':
             k2.metric('Vs previous trading day', format_pct(daily_change))
             k3.metric('Latest daily volume', f"{latest['volume']:,.0f}" if pd.notna(latest["volume"]) else "—")
 
-            st.markdown(f'#### {symbol} · daily candles')
+            content_heading(f'{symbol} · daily candles')
             candle = go.Figure(data=[go.Candlestick(
                 x=one["date"], open=one["open"], high=one["high"], low=one["low"], close=one["close"], name=symbol,
                 increasing_line_color="#059669", decreasing_line_color="#ef4444",
@@ -2085,7 +2090,7 @@ elif chosen_page == '02 Reading Stock Charts':
         st.markdown('<div style="height: 14px;"></div>', unsafe_allow_html=True)
         one = chart_data[chart_data["ticker"] == symbol].sort_values("date").copy()
         one['Volume colour'] = np.where(one["close"] >= one["open"], 'Close at/above open', 'Close below open')
-        st.markdown('#### Daily volume')
+        content_heading('Daily volume')
         st.caption('Taller bars mean more reported shares traded. Green means close at/above open; red means close below open.')
         vol = px.bar(
             one, x="date", y="volume", color='Volume colour',
@@ -2158,12 +2163,12 @@ elif chosen_page == '02A Candlestick Patterns':
             f"""<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">🕯️</div><div class="lesson-no">{len(chosen_pattern['bars'])} candles</div></div><div class="lesson-title">{escape(chosen_pattern['name'])}</div><div class="lesson-text">{escape(chosen_pattern['structure'])}</div><div style="margin-top:.8rem"><span class="tag">Traditional interpretation: {escape(chosen_pattern['bias'])}</span></div></div>""",
             unsafe_allow_html=True,
         )
-        st.markdown('#### Recognition checklist')
+        content_heading('Recognition checklist')
         st.markdown(chosen_pattern["recognize"])
-        st.markdown('#### Common interpretation')
+        content_heading('Common interpretation')
         st.markdown(chosen_pattern["meaning"])
     with selector_right:
-        st.markdown('#### Candle structure')
+        content_heading('Candle structure')
         pattern_fig = build_candle_pattern_figure(chosen_pattern)
         style_fig(pattern_fig, 490)
         # The selected pattern name is already shown in the information card.
@@ -2212,7 +2217,7 @@ elif chosen_page == '02A Candlestick Patterns':
         # load_prices already respects the selected period; don't truncate a one-year view to 90 candles.
         real_one = real_data[real_data["ticker"] == real_symbol].sort_values("date").copy() if not real_data.empty else pd.DataFrame()
         if not real_one.empty:
-            st.markdown(f'#### {real_symbol} · Historical daily candles ({PERIODS[real_period]})')
+            content_heading(f'{real_symbol} · Historical daily candles ({PERIODS[real_period]})')
             real_fig = go.Figure(data=[go.Candlestick(
                 x=real_one["date"], open=real_one["open"], high=real_one["high"], low=real_one["low"], close=real_one["close"], name=real_symbol,
                 increasing_line_color="#059669", decreasing_line_color="#ef4444",
@@ -2394,7 +2399,7 @@ elif chosen_page == '02B Technical Indicators':
     # The explanation is directly below the chart and follows the single selected indicator.
     with st.container(border=True):
         if tech_indicator_choice == 'Fibonacci Retracement':
-            st.markdown('#### Fibonacci Retracement | Divide a price move into reference levels')
+            content_heading('Fibonacci Retracement | Divide a price move into reference levels')
             st.markdown(escape_markdown_dollars("""
 **What is Fibonacci Retracement?** After a rise or fall, price may move back part of the way. Retracement lines mark commonly watched proportions of that earlier move.
 
@@ -2587,7 +2592,7 @@ elif chosen_page == '04 Researching a Company':
     # --- Tab 2: statements as three different views ---
     if lesson_section == '01 · Financial Statements':
         section_heading("THREE STATEMENTS · ONE STORY", 'Three statements answer three different questions', 'The Income statement covers profit over a period. The Balance sheet shows assets, liabilities and equity on a reporting date. The Cash flow statement tracks cash over a period. All examples use Orange Grove Drinks.')
-        st.markdown('#### Choose a statement')
+        content_heading('Choose a statement')
         st.markdown('Look at the chart first, then follow the calculations and questions.')
         statement_cards = [
             {"prefix": "①", "label": 'Income statement', "question": 'How much did it earn during the period?', "copy": 'Start with revenue and subtract direct costs, operating expenses, interest and taxes to understand gross profit, operating income and net income.', "value": '① Income statement'},
@@ -2627,7 +2632,7 @@ elif chosen_page == '04 Researching a Company':
                 decreasing={"marker": {"color": "#ef4444"}},
                 totals={"marker": {"color": "#2563eb"}},
             ))
-            st.markdown('#### Orange Grove Drinks · Profit bridge')
+            content_heading('Orange Grove Drinks · Profit bridge')
             style_fig(income_fig, 455)
             income_fig.update_layout(
                 showlegend=False, title=None,
@@ -2639,7 +2644,7 @@ elif chosen_page == '04 Researching a Company':
             st.plotly_chart(income_fig, width="stretch", key="income_statement_waterfall")
             st.caption('Items run across the bottom; amounts run up the side. Costs reduce the previous total. Subtotals show what remains. Hover over a bar to check its value.')
 
-            st.markdown('### Read the Income statement step by step')
+            content_heading('Read the Income statement step by step', level="h3")
             st.markdown('**Revenue is the starting point.** Follow sales down through costs and expenses to profit. This chart shows accounting profit for a reporting period. Cash on hand, debt and whether a stock is attractively priced require other evidence.')
             income_steps = [
                 ('Step 1 | Revenue $10,000', "Customers' drink and snack purchases create $10,000 of sales. Making products, paying staff and running stores still cost money. For a real company, ask whether growth came from more sales, higher prices, acquisitions or currency changes, and check how revenue is recognized."),
@@ -2650,7 +2655,7 @@ elif chosen_page == '04 Researching a Company':
             for step_title, step_copy in income_steps:
                 st.markdown(escape_markdown_dollars(f"**{step_title}**\n\n{step_copy}"))
             st.markdown(escape_markdown_dollars('Results: gross profit $6,000 (60% gross margin); operating income $2,000 (20% operating margin); net income $1,500 (15% net margin). Each margin represents a different stage of cost deductions.'))
-            st.markdown('### What should you ask next?')
+            content_heading('What should you ask next?', level="h3")
             st.markdown("""- **Are margins improving?** Compare several quarters or years. Are costs growing faster than revenue?
 - **Can growth continue?** Separate more sales, price increases and one-time effects. Read management discussion, segment data and notes.
 - **Did profit become cash?** Accrual accounting can record a credit sale before the customer pays. Compare the Cash flow statement.""")
@@ -2668,7 +2673,7 @@ elif chosen_page == '04 Researching a Company':
                 textposition="outside", cliponaxis=False,
                 hovertemplate='<b>%{y}</b><br>Amount: $%{x:,.0f}<extra></extra>',
             ))
-            st.markdown('#### Orange Grove Drinks · Assets and funding')
+            content_heading('Orange Grove Drinks · Assets and funding')
             style_fig(balance, 455)
             balance.update_layout(
                 title=None,
@@ -2680,12 +2685,12 @@ elif chosen_page == '04 Researching a Company':
             st.caption('Green bars show assets; red bars show liabilities; blue shows equity. A longer horizontal bar means a larger amount.')
             st.markdown(escape_markdown_dollars('Assets $12,300 = liabilities $7,300 + equity $5,000'))
 
-            st.markdown('### Read the Balance sheet step by step')
+            content_heading('Read the Balance sheet step by step', level="h3")
             st.markdown("**Think of a photograph taken on one date.** The Balance sheet shows what a company controls, what it owes and the owners' remaining book equity on the reporting date. These balances do not represent a whole year's earnings.")
             st.markdown(escape_markdown_dollars("**Step 1 | Assets: What resources does it control?** Total assets of $12,300 include cash $1,800, receivables $2,200, inventory $1,800, and equipment and other assets $6,500. Cash pays bills directly. Receivables await customers' payments and carry collection risk. Inventory must sell and can expire, break or need discounts. Equipment supports operations but is harder to turn into cash. Assets differ in liquidity and risk."))
             st.markdown(escape_markdown_dollars('**Step 2 | Liabilities: What obligations must it meet?** Accounts payable $1,800, short-term debt $1,500 and long-term debt $4,000 total $7,300. Payables usually await payment to suppliers. Short-term debt falls due sooner; long-term debt still requires interest and repayment. For real companies, inspect cash, due dates, rates, interest expense and the ability to generate cash.'))
             st.markdown(escape_markdown_dollars('**Step 3 | Equity $5,000:** Assets − liabilities = equity: $12,300 − $7,300 = $5,000. This is accounting book equity. Cash balance and stock market capitalization are different measures. Market capitalization is share price × shares outstanding.'))
-            st.markdown('### Three areas to investigate')
+            content_heading('Three areas to investigate', level="h3")
             st.markdown("""- **Short-term payments:** Compare cash and current assets with upcoming obligations.
 - **Working capital quality:** Compare receivables and inventory with revenue over several years.
 - **Debt pressure:** Check rates, maturity dates and whether operating cash flow supports repayment.""")
@@ -2699,7 +2704,7 @@ elif chosen_page == '04 Researching a Company':
                 textposition="outside", cliponaxis=False,
                 hovertemplate='<b>%{y}</b><br>Cash flow: $%{x:,.0f}<extra></extra>',
             ))
-            st.markdown('#### Orange Grove Drinks · Cash movements')
+            content_heading('Orange Grove Drinks · Cash movements')
             style_fig(cf_fig, 430)
             cf_fig.update_layout(
                 title=None,
@@ -2711,18 +2716,18 @@ elif chosen_page == '04 Researching a Company':
             st.caption('Green shows cash coming in; red shows cash going out. Blue marks the total net change. Right of zero means inflow; left means outflow.')
             st.markdown(escape_markdown_dollars('Net change in cash = $900 − $1,500 + $1,000 = +$400'))
 
-            st.markdown('### Read the Cash flow statement step by step')
+            content_heading('Read the Cash flow statement step by step', level="h3")
             st.markdown('**Profit and cash answer different questions.** Accounting can recognize revenue before payment and expenses before cash leaves. The Cash flow statement follows actual cash movements, helping show whether operations bring in cash and where it goes.')
             st.markdown(escape_markdown_dollars('**Step 1 | Operating cash flow +$900:** Cash collected from customers minus payments to suppliers, staff, landlords and taxes leaves $900. Compare it with net income and several years of data to study cash generation.'))
             st.markdown(escape_markdown_dollars('**Step 2 | Investing cash flow −$1,500:** Investing includes equipment, store improvements, acquisitions and investment assets. This example has a $1,500 net outflow. Check the detail to see where it went, then track later revenue, profit and cash flow.'))
             st.markdown(escape_markdown_dollars('**Step 3 | Financing cash flow +$1,000:** Financing includes borrowing, debt repayment, share issuance and dividends. This $1,000 inflow could have different effects: borrowing adds repayment obligations; issuing shares can dilute existing owners.'))
             st.markdown(escape_markdown_dollars('**Step 4 | Net cash increase $400:** To find closing cash, start with opening cash and include other statement items, such as exchange-rate effects.'))
-            st.markdown('### Four areas to investigate')
+            content_heading('Four areas to investigate', level="h3")
             st.markdown("""- **Operating cash trends:** Review several years and seasonal effects.
 - **Profit versus cash:** Check receivables, inventory, payables and depreciation.
 - **Investment spending:** Identify equipment spending, acquisitions and other investments.
 - **Funding sources:** Distinguish operating cash, asset sales, borrowing and share issuance.""")
-        st.markdown('#### Connect the three statements')
+        content_heading('Connect the three statements')
         st.markdown("""- **Income statement:** Revenue, costs, expenses and profit over a period.
 - **Balance sheet:** Assets, liabilities and equity on a reporting date.
 - **Cash flow statement:** Where cash came from and went during a period.
@@ -2933,7 +2938,7 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
                     website = str(raw_info.get("website"))
                     if website.startswith("https://") or website.startswith("http://"):
                         st.markdown(f'Company website: [{website}]({website})')
-        st.markdown('#### Company research checklist')
+        content_heading('Company research checklist')
         checklist_items = [
             'I can explain what the company sells, who its customers are and how it earns money.',
             'I checked revenue and profit across several periods.',
@@ -2949,7 +2954,7 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
                 if st.checkbox(item, key=f"company_research_check_{idx}"):
                     checked_count += 1
         st.progress(checked_count / len(checklist_items), text=f'Research checklist: {checked_count}/{len(checklist_items)} items')
-        st.markdown('#### Write your research conclusion')
+        content_heading('Write your research conclusion')
         research_note = st.text_area('Use three sentences: What do I know? What must I verify? What is the biggest uncertainty?', key="company_research_note", height=110, placeholder='The company earns money by… Current data shows… I still need to verify…')
         if st.button('Save research notes', key="company_research_save_note"):
             if not research_note.strip():
@@ -3254,7 +3259,7 @@ elif chosen_page == 'Final Quiz':
                 st.success('Quiz completion recorded.')
         else:
             st.info(f'You have not yet reached {required_score}/{len(questions)} points. Review the lessons linked to incorrect answers, then try again.')
-        st.markdown('### Your results | Green = correct; red = incorrect')
+        content_heading('Your results | Green = correct; red = incorrect', level="h3")
         for i, q in enumerate(questions):
             render_final_answer_review(i + 1, q[0], q[1], int(result["answers"][i]), q[2], q[3], q[4])
         st.button('Restart the 24-question quiz', key="comprehensive_quiz_retry", on_click=reset_comprehensive_quiz)
