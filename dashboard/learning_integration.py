@@ -35,7 +35,7 @@ def return_to_markets() -> None:
     st.session_state.learn_embedded = False
 
 
-@st.dialog("Your study path", position="right", width="small")
+@st.dialog(t("Your study path"), position="right", width="small")
 def show_study_path() -> None:
     st.markdown(
         '<span class="study-path-marker"></span>'

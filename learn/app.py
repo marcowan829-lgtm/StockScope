@@ -571,7 +571,7 @@ Plotting a cloud ahead does not mean it knows future prices: it shifts already c
     }
 
     if choice not in lessons:
-        st.info('This indicator lesson is not available. Choose another indicator above.')
+        st.info(t('This indicator lesson is not available. Choose another indicator above.'))
         return
 
     title, lesson_markdown = lessons[choice]
@@ -1509,20 +1509,20 @@ def build_candle_pattern_figure(pattern: dict) -> go.Figure:
             x=labels[:len(prefix_bars)],
             open=[b[0] for b in prefix_bars], high=[b[1] for b in prefix_bars],
             low=[b[2] for b in prefix_bars], close=[b[3] for b in prefix_bars],
-            name='Prior price action', increasing_line_color="#8ea5bf", decreasing_line_color="#64758d",
+            name=t('Prior price action'), increasing_line_color="#8ea5bf", decreasing_line_color="#64758d",
             increasing_fillcolor="#8ea5bf", decreasing_fillcolor="#64758d",
         ))
     fig.add_trace(go.Candlestick(
         x=labels[len(prefix):],
         open=[b[0] for b in pattern_bars], high=[b[1] for b in pattern_bars],
         low=[b[2] for b in pattern_bars], close=[b[3] for b in pattern_bars],
-        name='Selected pattern', increasing_line_color="#059669", decreasing_line_color="#ef4444",
+        name=t('Selected pattern'), increasing_line_color="#059669", decreasing_line_color="#ef4444",
         increasing_fillcolor="#059669", decreasing_fillcolor="#ef4444",
     ))
     fig.update_layout(
-        title=dict(text=f"{pattern['name']} · synthetic illustration", x=0.02, xanchor="left"),
-        xaxis_title='Read the context before the pattern',
-        yaxis_title='Illustrative price (not market data)',
+        title=dict(text=f"{t(pattern['name'])} · {t('synthetic illustration')}", x=0.02, xanchor="left"),
+        xaxis_title=t('Read the context before the pattern'),
+        yaxis_title=t('Illustrative price (not market data)'),
         xaxis_rangeslider_visible=False,
         hovermode="x unified",
         # Keep the legend outside the plot area, below the x-axis labels.
@@ -1660,11 +1660,6 @@ if chosen_page == 'Learning Home':
             info_card(icon, title, body)
     st.write("")
     completed = set(st.session_state["completed_lessons"])
-    n_complete = len(completed.intersection(set(LESSON_GUIDE.keys())))
-    m1, m2, m3 = st.columns(3)
-    m1.metric(t('Learning units'), t('{n} units', n=len(LESSON_GUIDE)), t('From basic concepts to investor protection'))
-    m2.metric(t('Interactive charts'), t('3+ types'), t('Line · bar · scatter'))
-    m3.metric(t('Your progress'), f"{n_complete}/{len(LESSON_GUIDE)}", t('Completed lessons'))
     mastered = sum(bool(st.session_state.get("quiz_attempts", {}).get(name, {}).get("passed")) for name in LESSON_GUIDE)
     st.caption(t('Knowledge checks: {mastered}/{total} lessons passed at least once. You can retry. Passing a check and marking a lesson complete are separate actions.', mastered=mastered, total=len(LESSON_GUIDE)))
 
@@ -1685,7 +1680,7 @@ if chosen_page == 'Learning Home':
             signal_case = None
 
         if signal_case is None:
-            st.warning('No complete historical example was found through 2026-10-06. Check your connection and refresh. This question does not replace real data with fictional prices.')
+            st.warning(t('No complete historical example was found through 2026-10-06. Check your connection and refresh. This question does not replace real data with fictional prices.'))
         else:
             full_data = signal_case["data"].copy().sort_values("date").reset_index(drop=True)
             anchor_idx = int(signal_case["anchor_idx"])
@@ -1698,7 +1693,7 @@ if chosen_page == 'Learning Home':
             macd_cross_date = pd.Timestamp(full_data.iloc[int(signal_case["macd_cross_idx"])]["date"])
             future_data = full_data.iloc[anchor_idx + 1:future_end_idx + 1].copy()
             if future_data.empty:
-                st.warning('This sample lacks a complete following 20 trading days. Refresh to choose another sample.')
+                st.warning(t('This sample lacks a complete following 20 trading days. Refresh to choose another sample.'))
             else:
                 start_close = float(full_data.iloc[anchor_idx]["close"])
                 end_close = float(future_data.iloc[-1]["close"])
@@ -1761,7 +1756,7 @@ if chosen_page == 'Learning Home':
                     st.caption(
                         f"Sample: {signal_case['ticker']} | Observation date: {signal_date:%Y-%m-%d} | Reveal ends: {pd.Timestamp(future_data.iloc[-1]['date']):%Y-%m-%d}. Real Yahoo Finance adjusted daily data. Candle and volume colours compare open/close; MACD histogram colours show its sign."
                     )
-                    if st.button('Try challenge 01 again', key="home_scenario_01_reset"):
+                    if st.button(t('Try challenge 01 again'), key="home_scenario_01_reset"):
                         st.session_state.pop("home_scenario_01_result", None)
                         st.session_state.pop("home_scenario_01_answer", None)
                         st.rerun()
@@ -1790,7 +1785,7 @@ if chosen_page == 'Learning Home':
                 status = t('✓ Completed') if d[5].split(" ", 1)[-1] in completed else t(d[4])
                 with st.container(key=f"home_lesson_{d[0]}"):
                     st.markdown(
-                        f'<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">{d[1]}</div><div class="lesson-no">LESSON {d[0]}</div></div><div class="lesson-title">{t(d[2])}</div><div class="lesson-text">{t(d[3])}</div><span class="tag">{status}</span></div>',
+                        f'<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">{d[1]}</div><div class="lesson-no">{t("LESSON")} {d[0]}</div></div><div class="lesson-title">{t(d[2])}</div><div class="lesson-text">{t(d[3])}</div><span class="tag">{status}</span></div>',
                         unsafe_allow_html=True,
                     )
                     st.button(t('Open lesson →'), key=f"home_{d[0]}", width="stretch", on_click=nav_to, args=(d[5],))
@@ -1855,26 +1850,26 @@ elif chosen_page == '01 Stock Market Basics':
     if lesson_section == lesson1_sections[0]:
         section_heading("OWNERSHIP", "A share is part of a company's ownership", 'It is not a debt promise or a fixed-income product.')
         st.markdown(
-            """Owning shares means owning part of a company's equity. Common shareholders may have voting rights and receive dividends; rights depend on share class, company documents and local rules. Dividends and price gains are not guaranteed.
+            t("""Owning shares means owning part of a company's equity. Common shareholders may have voting rights and receive dividends; rights depend on share class, company documents and local rules. Dividends and price gains are not guaranteed.
 
-Returns and risks depend on the business, finances, competition, expectations and broader markets. In a liquidation, common shareholders generally rank behind creditors and other senior claims. There may be nothing left for them."""
+Returns and risks depend on the business, finances, competition, expectations and broader markets. In a liquidation, common shareholders generally rank behind creditors and other senior claims. There may be nothing left for them.""")
         )
         with st.container(border=True):
             section_heading("TRY THE NUMBERS", 'Use a fictional company to understand market capitalization', 'Change the share price and number of shares to see why unit price differs from total equity market value.')
             calc_a, calc_b, calc_c = st.columns(3)
             with calc_a:
                 market_price = st.slider(
-                    'Assumed share price (USD)', min_value=5, max_value=200, value=20, step=5,
+                    t('Assumed share price (USD)'), min_value=5, max_value=200, value=20, step=5,
                     key="lesson1_market_price",
                 )
             with calc_b:
                 shares_outstanding_m = st.slider(
-                    'Shares outstanding (millions)', min_value=1, max_value=1000, value=100, step=1,
+                    t('Shares outstanding (millions)'), min_value=1, max_value=1000, value=100, step=1,
                     key="lesson1_shares_outstanding_m",
                 )
             with calc_c:
                 held_shares = st.number_input(
-                    'Assumed shares held', min_value=1, max_value=100000, value=100, step=100,
+                    t('Assumed shares held'), min_value=1, max_value=100000, value=100, step=100,
                     key="lesson1_held_shares",
                 )
             outstanding_shares = int(shares_outstanding_m) * 1_000_000
@@ -1884,28 +1879,28 @@ Returns and risks depend on the business, finances, competition, expectations an
             result_a, result_b, result_c = st.columns(3)
             with result_a:
                 st.markdown(escape_markdown_dollars(f'**Assumed market capitalization**\n\n## ${market_cap:,.0f}'))
-                st.caption('Share price × shares outstanding')
+                st.caption(t('Share price × shares outstanding'))
             with result_b:
                 st.markdown(escape_markdown_dollars(f'**Market value of this holding**\n\n## ${holding_value:,.2f}'))
-                st.caption('Assumed current price × shares held')
+                st.caption(t('Assumed current price × shares held'))
             with result_c:
                 st.markdown(f'**Ownership percentage**\n\n## {ownership_pct:.6f}%')
-                st.caption('Shares held ÷ shares outstanding')
-            st.caption('This is a simplified learning calculation. Check share-count definitions in real data. Market capitalization is equity market value, not book assets, cash or enterprise value.')
+                st.caption(t('Shares held ÷ shares outstanding'))
+            st.caption(t('This is a simplified learning calculation. Check share-count definitions in real data. Market capitalization is equity market value, not book assets, cash or enterprise value.'))
 
-        with st.expander('Share price and value: two different ideas'):
+        with st.expander(t('Share price and value: two different ideas')):
             st.markdown(
-                """- **Share price:** the quoted or last traded price of one share at a point in time.
+                t("""- **Share price:** the quoted or last traded price of one share at a point in time.
 - **Market capitalization:** commonly estimated as price × shares outstanding.
-- **Valuation:** also requires future cash flow, growth, competitive advantages, financial position and risk. Market cap alone does not tell you whether a stock is cheap."""
+- **Valuation:** also requires future cash flow, growth, competitive advantages, financial position and risk. Market cap alone does not tell you whether a stock is cheap.""")
             )
 
     if lesson_section == lesson1_sections[1]:
         section_heading("MARKET STRUCTURE", 'From issuing shares to completing a trade', 'Separate issuers, investors, brokers, trading venues and regulators.')
         st.markdown(
-            """**Primary market: issuing securities to raise capital.** An IPO or later share offering can raise money through newly issued shares. Structures and rules differ by market.
+            t("""**Primary market: issuing securities to raise capital.** An IPO or later share offering can raise money through newly issued shares. Structures and rules differ by market.
 
-**Secondary market: trading existing securities.** Investors commonly trade through brokers. In an ordinary secondary trade, money changes hands between buyer and seller; the company does not directly receive the price every time a share is resold. Later offerings and buybacks are separate corporate actions."""
+**Secondary market: trading existing securities.** Investors commonly trade through brokers. In an ordinary secondary trade, money changes hands between buyer and seller; the company does not directly receive the price every time a share is resold. Later offerings and buybacks are separate corporate actions.""")
         )
         participants = st.columns(3)
         with participants[0]:
@@ -1914,15 +1909,15 @@ Returns and risks depend on the business, finances, competition, expectations an
             info_card("👥", 'Investors', 'Individuals, funds, pension plans and institutions submit orders according to their goals and constraints.')
         with participants[2]:
             info_card("🔗", 'Brokers and trading venues', 'Brokers receive and route orders. Exchanges and other venues provide matching and execution mechanisms.')
-        with st.expander('A typical stock trade'):
+        with st.expander(t('A typical stock trade')):
             st.markdown(
-                """**Investor decides → submits an order to a broker → broker routes the order → a venue or liquidity provider executes it → clearing and settlement deliver securities and cash.**
+                t("""**Investor decides → submits an order to a broker → broker routes the order → a venue or liquidity provider executes it → clearing and settlement deliver securities and cash.**
 
-Execution depends on broker arrangements, market structure, order type and liquidity. Clicking Buy does not guarantee the last displayed price. Volatility and the bid-ask spread also affect the result."""
+Execution depends on broker arrangements, market structure, order type and liquidity. Clicking Buy does not guarantee the last displayed price. Volatility and the bid-ask spread also affect the result.""")
             )
-        with st.expander('Why do public companies disclose information?'):
+        with st.expander(t('Why do public companies disclose information?')):
             st.markdown(
-                'Investors need verifiable information. US filings commonly include annual reports (10-K), quarterly reports (10-Q) and current reports (8-K). Other markets have different rules. Financial statements, announcements and risk factors connect market stories with company research.'
+                t('Investors need verifiable information. US filings commonly include annual reports (10-K), quarterly reports (10-Q) and current reports (8-K). Other markets have different rules. Financial statements, announcements and risk factors connect market stories with company research.')
             )
 
     if lesson_section == lesson1_sections[2]:
@@ -1934,27 +1929,27 @@ Execution depends on broker arrangements, market structure, order type and liqui
             {'Product': "ETF", 'What you own': 'Fund shares traded on an exchange', 'Possible returns': 'Depends on underlying assets, costs and market prices', 'Risks to understand': 'Market risk, costs, tracking error and liquidity'},
             {'Product': 'Mutual fund', 'What you own': "Pooled money invested according to a fund's objectives", 'Possible returns': 'Depends on holdings, strategy and costs', 'Risks to understand': 'Market/strategy risk, management fees and redemption terms'},
         ])
-        st.dataframe(tool_table, width="stretch", hide_index=True)
+        st.dataframe(tool_table.rename(columns=lambda c: t(c)).map(lambda x: t(x) if isinstance(x, str) else x), width="stretch", hide_index=True)
         st.markdown(
-            '**An index is not an index fund.** An index measures a market or basket of securities. An index fund, structured as an ETF or mutual fund, tries to follow it. A broader basket can reduce company-specific concentration but cannot remove a market-wide decline.'
+            t('**An index is not an index fund.** An index measures a market or basket of securities. An index fund, structured as an ETF or mutual fund, tries to follow it. A broader basket can reduce company-specific concentration but cannot remove a market-wide decline.')
         )
-        with st.expander('Common/preferred shares and investment styles'):
+        with st.expander(t('Common/preferred shares and investment styles')):
             st.markdown(
-                """- **Common and preferred shares:** voting, dividends and liquidation priority can differ; check terms.
+                t("""- **Common and preferred shares:** voting, dividends and liquidation priority can differ; check terms.
 - **Growth and value:** growth focuses on expected expansion; value compares market price with estimated business value. Neither label guarantees returns.
 - **Large, mid and small cap:** categories based on market capitalization; thresholds vary.
-- **Bull and bear markets:** describe broader trends, not a conclusion from one day's move."""
+- **Bull and bear markets:** describe broader trends, not a conclusion from one day's move.""")
             )
 
     if lesson_section == lesson1_sections[3]:
         section_heading("PRICE & RETURN", 'Price is a trading outcome; return has several components', 'A market price reflects transactions and expectations at a moment in time, not a direct reading of intrinsic value.')
         st.markdown(
-            """- **Bid:** a buyer's quoted price; the best bid is the highest available bid.
+            t("""- **Bid:** a buyer's quoted price; the best bid is the highest available bid.
 - **Ask:** a seller's quoted price; the best ask is the lowest available ask.
 - **Bid-ask spread:** ask minus bid, one part of trading cost.
 - **Last price:** a completed trade's price, not a guarantee for your next order.
 
-Orders, company news, industries, interest rates, the economy, sentiment and liquidity can change prices. Good results may still disappoint expectations, and a stock can fall despite a strong business report."""
+Orders, company news, industries, interest rates, the economy, sentiment and liquidity can change prices. Good results may still disappoint expectations, and a stock can fall despite a strong business report.""")
         )
         with st.container(border=True):
             section_heading("TRY A RETURN EXAMPLE", 'Try it: price changes plus dividends', 'Assume a $20 purchase price. Change the current price and dividends per share to see a simple total return.')
@@ -1964,19 +1959,19 @@ Orders, company news, industries, interest rates, the economy, sentiment and liq
                 st.markdown(escape_markdown_dollars("""**Assumed purchase price**
 
 ## $20.00"""))
-                st.caption('Cost per share before fees')
+                st.caption(t('Cost per share before fees'))
             with return_b:
                 ending_price = st.slider(
-                    'Assumed current share price (USD)', min_value=5, max_value=35, value=22, step=1,
+                    t('Assumed current share price (USD)'), min_value=5, max_value=35, value=22, step=1,
                     key="lesson1_ending_price",
                 )
             with return_c:
                 dividend_per_share = st.slider(
-                    'Dividends per share during the period (USD)', min_value=0.0, max_value=2.0, value=0.5, step=0.25,
+                    t('Dividends per share during the period (USD)'), min_value=0.0, max_value=2.0, value=0.5, step=0.25,
                     key="lesson1_dividend_per_share",
                 )
             return_shares = st.number_input(
-                'Assumed shares held', min_value=1, max_value=10000, value=100, step=10,
+                t('Assumed shares held'), min_value=1, max_value=10000, value=100, step=10,
                 key="lesson1_return_shares",
             )
             price_change_per_share = float(ending_price) - purchase_price
@@ -1986,10 +1981,10 @@ Orders, company news, industries, interest rates, the economy, sentiment and liq
             st.markdown(escape_markdown_dollars(
                 f'**Price change:** ${price_change_per_share:,.2f}/share    **Assumed dividend:** ${float(dividend_per_share):,.2f}/share    **Total return before taxes/fees:** ${total_return_cash:,.2f}({simple_total_return:+.2f}%)'
             ))
-            st.caption('Assumes dividends have been received and excludes taxes, fees, reinvestment and holding-period differences. Dividends may not offset a price loss.')
-        with st.expander('Basic stock order types'):
+            st.caption(t('Assumes dividends have been received and excludes taxes, fees, reinvestment and holding-period differences. Dividends may not offset a price loss.'))
+        with st.expander(t('Basic stock order types')):
             st.markdown(
-                'A **market order** prioritises prompt execution without guaranteeing price. A **limit order** sets an acceptable price or better, but may not fill. A **stop order** generally becomes a market order when triggered, so its trigger is not a guaranteed execution price. Broker and market rules vary; the next lesson explores execution.'
+                t('A **market order** prioritises prompt execution without guaranteeing price. A **limit order** sets an acceptable price or better, but may not fill. A **stop order** generally becomes a market order when triggered, so its trigger is not a guaranteed execution price. Broker and market rules vary; the next lesson explores execution.')
             )
 
     if lesson_section == lesson1_sections[4]:
@@ -2003,13 +1998,13 @@ Orders, company news, industries, interest rates, the economy, sentiment and liq
             info_card("🧺", 'Diversification and concentration', 'Spreading across businesses, industries and asset classes can reduce some concentration risk, but cannot guarantee profit or prevent a broad decline.')
             info_card("💸", 'Costs and liquidity', 'Compare commissions, spreads, fund expenses, taxes and currency costs. Thinly traded securities can be difficult to sell at a desired price.')
             info_card("🔎", 'Verify sources', 'Check filings, announcements, fund documents and intermediary registration. Be wary of guaranteed returns, urgent transfers and secret tips.')
-        with st.expander('Five common beginner mistakes'):
+        with st.expander(t('Five common beginner mistakes')):
             st.markdown(
-                """1. **Comparing unit prices only:** ignoring share count, market cap, earnings, growth and risk.
+                t("""1. **Comparing unit prices only:** ignoring share count, market cap, earnings, growth and risk.
 2. **Assuming past gains must continue:** history is not a guarantee.
 3. **Treating dividends as free money:** total return includes price changes, distributions and costs.
 4. **Treating ETFs as risk-free:** holdings, concentration, costs and tracking error still matter.
-5. **Ignoring goals and timing:** choices need to reflect the purpose, horizon and ability to bear losses."""
+5. **Ignoring goals and timing:** choices need to reflect the purpose, horizon and ability to bear losses.""")
             )
 
     section_heading("KEY TERMS", 'Quick glossary')
@@ -2022,22 +2017,22 @@ Orders, company news, industries, interest rates, the economy, sentiment and liq
         {'Term': 'Liquidity', 'Plain-English meaning': 'How easily an asset can trade without a large price concession.'},
         {'Term': 'Diversification', 'Plain-English meaning': 'Spreading sources of risk to reduce concentration, without guaranteeing against losses.'},
     ])
-    st.dataframe(glossary, width="stretch", hide_index=True)
+    st.dataframe(glossary.rename(columns=lambda c: t(c)).map(lambda x: t(x) if isinstance(x, str) else x), width="stretch", hide_index=True)
 
     st.write("")
     section_heading("QUICK CHECK", 'Check your understanding')
     answer = st.radio(
-        'Company A trades at $20 a share and B at $200. Can this alone tell us which company is more expensive?',
+        t('Company A trades at $20 a share and B at $200. Can this alone tell us which company is more expensive?'),
         ["Yes: B's higher share price means it is more expensive.", 'No: we also need share count, market cap, earnings and other information.', 'Yes: a higher share price always means higher risk.'],
-        key="basics_quiz",
+        key="basics_quiz", format_func=t,
     )
-    if st.button('Submit answer', key="basics_submit"):
+    if st.button(t('Submit answer'), key="basics_submit"):
         if answer.startswith('No'):
             record_quiz_attempt('Stock Market Basics', True)
-            st.success('Correct. A share price is a unit price. Valuation also needs share count, market cap, earnings, growth expectations and risk.')
+            st.success(t('Correct. A share price is a unit price. Valuation also needs share count, market cap, earnings, growth expectations and risk.'))
         else:
             record_quiz_attempt('Stock Market Basics', False)
-            st.error('Think again: share counts can differ greatly. Unit price alone cannot compare total market capitalization or valuation. Review the explanation and retry.')
+            st.error(t('Think again: share counts can differ greatly. Unit price alone cannot compare total market capitalization or valuation. Review the explanation and retry.'))
     lesson_completion_button('Stock Market Basics', "finish_basics")
 
 
@@ -2056,7 +2051,7 @@ elif chosen_page == '02 Reading Stock Charts':
         lesson_period = st.selectbox(t('History window'), ["1mo", "3mo", "6mo", "1y"], index=1, format_func=lambda x: t(PERIODS[x]), key=chart_period_key)
         st.markdown('<div class="callout">Start with three months. Hover over candles and inspect the OHLC values one by one.</div>', unsafe_allow_html=True)
         content_heading('Five chart essentials')
-        st.markdown("""**Open:** price at the start of the bar.
+        st.markdown(t("""**Open:** price at the start of the bar.
 
 **High:** highest price during it.
 
@@ -2064,7 +2059,7 @@ elif chosen_page == '02 Reading Stock Charts':
 
 **Close:** price at the end.
 
-**Volume:** reported shares traded during the bar.""")
+**Volume:** reported shares traded during the bar."""))
     chart_data, chart_error = safe_prices([symbol], lesson_period)
     show_data_warning(chart_error)
     with right:
@@ -2096,7 +2091,7 @@ elif chosen_page == '02 Reading Stock Charts':
         one = chart_data[chart_data["ticker"] == symbol].sort_values("date").copy()
         one['Volume colour'] = np.where(one["close"] >= one["open"], 'Close at/above open', 'Close below open')
         content_heading('Daily volume')
-        st.caption('Taller bars mean more reported shares traded. Green means close at/above open; red means close below open.')
+        st.caption(t('Taller bars mean more reported shares traded. Green means close at/above open; red means close below open.'))
         vol = px.bar(
             one, x="date", y="volume", color='Volume colour',
             color_discrete_map={'Close at/above open': "#059669", 'Close below open': "#ef4444"},
@@ -2107,29 +2102,29 @@ elif chosen_page == '02 Reading Stock Charts':
         style_fig(vol, 350)
         vol.update_layout(margin=dict(l=34, r=18, t=22, b=42))
         st.plotly_chart(vol, width="stretch")
-        st.markdown('Volume describes activity; direction needs price action and context.')
-        with st.expander('Latest 12 trading days: OHLCV'):
+        st.markdown(t('Volume describes activity; direction needs price action and context.'))
+        with st.expander(t('Latest 12 trading days: OHLCV')):
             show = one.tail(12)[["date", "open", "high", "low", "close", "volume"]].rename(columns={"date": 'Date', "open": 'Open', "high": 'High', "low": 'Low', "close": 'Close', "volume": 'Volume'})
             st.dataframe(show.sort_values('Date', ascending=False), width="stretch", hide_index=True)
-            st.download_button('Download stock data CSV', show.to_csv(index=False).encode("utf-8-sig"), file_name=f"{symbol}_OHLCV.csv", mime="text/csv")
+            st.download_button(t('Download stock data CSV'), show.to_csv(index=False).encode("utf-8-sig"), file_name=f"{symbol}_OHLCV.csv", mime="text/csv")
 
         section_heading("QUICK CHECK", 'What can this chart tell you?')
-        pick = st.radio("A day's volume rises sharply. What is the most careful interpretation?", ['The price must rise tomorrow.', 'Trading is busier; direction needs other evidence.', 'Company profit has definitely increased.'], key="volume_quiz")
-        if st.button('Check understanding', key="volume_submit"):
+        pick = st.radio(t("A day's volume rises sharply. What is the most careful interpretation?"), ['The price must rise tomorrow.', 'Trading is busier; direction needs other evidence.', 'Company profit has definitely increased.'], key="volume_quiz", format_func=t)
+        if st.button(t('Check understanding'), key="volume_submit"):
             if pick.startswith('Trading'):
                 record_quiz_attempt('Reading Stock Charts', True)
-                st.success('Correct. Volume describes activity, not a standalone forecast. Write down one observation from the chart.')
+                st.success(t('Correct. Volume describes activity, not a standalone forecast. Write down one observation from the chart.'))
             else:
                 record_quiz_attempt('Reading Stock Charts', False)
-                st.error('Volume does not guarantee direction or prove a change in company earnings. Review and retry.')
-        with st.expander('More: timeframes, adjusted prices and common mistakes'):
-            st.markdown("""**Timeframes:** minute candles show short-term detail; daily candles summarise trading days; weekly/monthly candles show longer periods. Noise and detail vary with the interval.
+                st.error(t('Volume does not guarantee direction or prove a change in company earnings. Review and retry.'))
+        with st.expander(t('More: timeframes, adjusted prices and common mistakes')):
+            st.markdown(t("""**Timeframes:** minute candles show short-term detail; daily candles summarise trading days; weekly/monthly candles show longer periods. Noise and detail vary with the interval.
 
 **Raw and adjusted prices:** splits and dividends can change historical adjusted OHLC. Check source definitions; adjusted history is not necessarily the price quoted at the time.
 
 **Colours:** conventions differ by platform and market. Read the legend and OHLC, not colour alone.
 
-**Limits:** candles and volume describe past activity. Explaining causes also requires events, fundamentals and market context.""")
+**Limits:** candles and volume describe past activity. Explaining causes also requires events, fundamentals and market context."""))
 
         lesson_completion_button('Reading Stock Charts', "finish_chart")
 
@@ -2140,38 +2135,38 @@ elif chosen_page == '02 Reading Stock Charts':
 elif chosen_page == '02A Candlestick Patterns':
     st.markdown('<div id="candle-pattern-top"></div>', unsafe_allow_html=True)
     hero(
-        'Lesson 02A | Candlestick Patterns',
-        'Explore single and multiple-candle structures, their context and traditional interpretations. Patterns describe price action, not guaranteed outcomes.',
-        "LESSON 02A · CANDLESTICK PATTERNS",
+        t('Lesson 02A | Candlestick Patterns'),
+        t('Explore single and multiple-candle structures, their context and traditional interpretations. Patterns describe price action, not guaranteed outcomes.'),
+        t('LESSON 02A · CANDLESTICK PATTERNS'),
     )
-    st.markdown('[↑ Back to lesson top](#candle-pattern-top)', unsafe_allow_html=False)
-    st.markdown("**Read the context:** earlier trend, location, volume and later price action matter. A pattern's name is not an independent trading signal.")
+    st.markdown(t('[↑ Back to lesson top](#candle-pattern-top)'), unsafe_allow_html=False)
+    st.markdown(t("**Read the context:** earlier trend, location, volume and later price action matter. A pattern's name is not an independent trading signal."))
 
     # The standalone candle anatomy/color explainer was removed at the user's request.
 
     group_names = list(dict.fromkeys(pattern["group"] for pattern in CANDLE_PATTERNS))
     selector_left, selector_right = st.columns([1, 1.5], gap="large")
     with selector_left:
-        chosen_group = st.selectbox('Step 1: choose a pattern group', group_names, key="candle_pattern_group")
+        chosen_group = st.selectbox(t('Step 1: choose a pattern group'), group_names, key="candle_pattern_group", format_func=t)
         candidates = [pattern for pattern in CANDLE_PATTERNS if pattern["group"] == chosen_group]
         available_pattern_names = [pattern["name"] for pattern in candidates]
         # When the category changes, reset an old pattern name that is no longer
         # available before Streamlit instantiates the dependent selectbox.
         if st.session_state.get("candle_pattern_name") not in available_pattern_names:
             st.session_state["candle_pattern_name"] = available_pattern_names[0]
-        chosen_pattern_name = st.selectbox('Step 2: choose a pattern', available_pattern_names, key="candle_pattern_name")
+        chosen_pattern_name = st.selectbox(t('Step 2: choose a pattern'), available_pattern_names, key="candle_pattern_name", format_func=t)
         # Selecting another candle pattern intentionally does NOT scroll the page.
         # Users often compare patterns while reading farther down this lesson; keep
         # their current reading position. Auto-scroll is reserved for main navigation.
         chosen_pattern = next(pattern for pattern in candidates if pattern["name"] == chosen_pattern_name)
         st.markdown(
-            f"""<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">🕯️</div><div class="lesson-no">{len(chosen_pattern['bars'])} candles</div></div><div class="lesson-title">{escape(chosen_pattern['name'])}</div><div class="lesson-text">{escape(chosen_pattern['structure'])}</div><div style="margin-top:.8rem"><span class="tag">Traditional interpretation: {escape(chosen_pattern['bias'])}</span></div></div>""",
+            f"""<div class="lesson-card"><div class="lesson-top"><div class="lesson-icon">🕯️</div><div class="lesson-no">{len(chosen_pattern['bars'])} candles</div></div><div class="lesson-title">{escape(t(chosen_pattern['name']))}</div><div class="lesson-text">{escape(t(chosen_pattern['structure']))}</div><div style="margin-top:.8rem"><span class="tag">{escape(t('Traditional interpretation'))}: {escape(t(chosen_pattern['bias']))}</span></div></div>""",
             unsafe_allow_html=True,
         )
         content_heading('Recognition checklist')
-        st.markdown(chosen_pattern["recognize"])
+        st.markdown(t(chosen_pattern["recognize"]))
         content_heading('Common interpretation')
-        st.markdown(chosen_pattern["meaning"])
+        st.markdown(t(chosen_pattern["meaning"]))
     with selector_right:
         content_heading('Candle structure')
         pattern_fig = build_candle_pattern_figure(chosen_pattern)
@@ -2185,15 +2180,15 @@ elif chosen_page == '02A Candlestick Patterns':
             legend=dict(orientation="h", yanchor="top", y=-0.24, xanchor="left", x=0),
         )
         st.plotly_chart(pattern_fig, width="stretch", key="candle_pattern_diagram")
-        st.caption("Synthetic OHLC values illustrate structure, not a real security's history. Green means close above open; red means close below open.")
+        st.caption(t("Synthetic OHLC values illustrate structure, not a real security's history. Green means close above open; red means close below open."))
 
     context_cols = st.columns(2, gap="large")
     with context_cols[0]:
-        info_card("📍", 'Context', chosen_pattern["context"], 'Read the preceding trend')
+        info_card("📍", 'Context', chosen_pattern["context"], t('Read the preceding trend'))
     with context_cols[1]:
-        info_card("🔎", 'Later confirmation', chosen_pattern["confirmation"], 'Not an automatic trade signal')
+        info_card("🔎", 'Later confirmation', chosen_pattern["confirmation"], t('Not an automatic trade signal'))
 
-    with st.expander('Pattern reference table', expanded=False):
+    with st.expander(t('Pattern reference table'), expanded=False):
         pattern_table = pd.DataFrame([
             {
                 'Group': p["group"],
@@ -2204,10 +2199,10 @@ elif chosen_page == '02A Candlestick Patterns':
             }
             for p in CANDLE_PATTERNS
         ])
-        filter_group = st.selectbox('Filter by group', ['All'] + group_names, key="candle_pattern_table_filter")
+        filter_group = st.selectbox(t('Filter by group'), ['All'] + group_names, key="candle_pattern_table_filter", format_func=t)
         if filter_group != 'All':
             pattern_table = pattern_table[pattern_table['Group'] == filter_group]
-        st.dataframe(pattern_table, width="stretch", hide_index=True)
+        st.dataframe(pattern_table.rename(columns=lambda c: t(c)).map(lambda x: t(x) if isinstance(x, str) else x), width="stretch", hide_index=True)
 
     st.write("")
     section_heading("STEP 2 · REAL MARKET", 'Practise on historical prices', 'Illustrations teach structure; real charts develop observation. Describe the prior trend first and avoid forcing an unclear shape into a pattern name.')
@@ -2215,7 +2210,7 @@ elif chosen_page == '02A Candlestick Patterns':
     with real_left:
         real_symbol = st.selectbox(t('Real stock / ETF'), list(TICKERS.keys()), index=list(TICKERS.keys()).index("NVDA"), format_func=ticker_label, key=lang_key("candle_real_symbol"))
         real_period = st.selectbox(t('History range'), ["5d", "1mo", "3mo", "6mo", "1y"], index=2, format_func=lambda x: t(PERIODS[x]), key=lang_key("candle_real_period"))
-        st.markdown('<div class="callout">Practice in this order: ① Check the earlier trend. ② Compare the body and wicks. ③ Notice where the pattern appears. ④ Check whether the next candles support the idea.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="callout">{t('Practice in this order: ① Check the earlier trend. ② Compare the body and wicks. ③ Notice where the pattern appears. ④ Check whether the next candles support the idea.')}</div>', unsafe_allow_html=True)
     real_data, real_error = safe_prices([real_symbol], real_period)
     show_data_warning(real_error)
     with real_right:
@@ -2228,14 +2223,14 @@ elif chosen_page == '02A Candlestick Patterns':
                 increasing_line_color="#059669", decreasing_line_color="#ef4444",
                 increasing_fillcolor="#059669", decreasing_fillcolor="#ef4444",
             )])
-            real_fig.update_layout(title=None, xaxis_title='Date', yaxis_title='Adjusted price (USD)', xaxis_rangeslider_visible=False, hovermode="x unified")
+            real_fig.update_layout(title=None, xaxis_title=t('Date'), yaxis_title=t('Adjusted price (USD)'), xaxis_rangeslider_visible=False, hovermode="x unified")
             style_fig(real_fig, 430)
             real_fig.update_layout(margin=dict(l=30, r=18, t=24, b=36))
             st.plotly_chart(real_fig, width="stretch", key="candle_patterns_real_chart")
         else:
-            st.info('No history is available right now. Explore the sample charts above and try again later.')
+            st.info(t('No history is available right now. Explore the sample charts above and try again later.'))
 
-    st.markdown('**What candlestick patterns do:** They describe price structure and suggest questions to investigate. Results vary by market, sample, pattern definition and trading costs. Test an idea against historical data before judging its usefulness.')
+    st.markdown(t('**What candlestick patterns do:** They describe price structure and suggest questions to investigate. Results vary by market, sample, pattern definition and trading costs. Test an idea against historical data before judging its usefulness.'))
     section_heading("STEP 3 · PRACTICE", 'Candlestick pattern check', 'Answer first, then read the explanations. Get at least 5 correct to pass this chapter. You can try again.')
     pattern_questions = [
         ('A Hammer and a Hanging Man look similar. What mainly distinguishes them?', ['The candle color', 'The trend before the pattern', 'The share price'], 1, 'A Hammer is usually discussed after a decline; a Hanging Man after a rise. Their shapes are similar, so the earlier trend matters more than color.'),
@@ -2249,13 +2244,13 @@ elif chosen_page == '02A Candlestick Patterns':
     with st.form("candle_patterns_quiz_form"):
         quiz_answers = []
         for qi, (question, options, correct_idx, explanation) in enumerate(pattern_questions):
-            quiz_answers.append(st.radio(f"{qi+1}. {question}", options, key=f"candle_pattern_quiz_{qi}", index=None))
-        quiz_submit = st.form_submit_button('Submit chapter answers', width="stretch")
+            quiz_answers.append(st.radio(f"{qi+1}. {t(question)}", options, key=f"candle_pattern_quiz_{qi}", index=None, format_func=t))
+        quiz_submit = st.form_submit_button(t('Submit chapter answers'), width="stretch")
     if quiz_submit:
         score = sum(answer == question[1][question[2]] for answer, question in zip(quiz_answers, pattern_questions))
         all_answered = all(answer is not None for answer in quiz_answers)
         if not all_answered:
-            st.warning('Answer every question before submitting.')
+            st.warning(t('Answer every question before submitting.'))
         else:
             passed = score >= 5
             record_quiz_attempt('Candlestick Patterns', passed)
@@ -2263,15 +2258,15 @@ elif chosen_page == '02A Candlestick Patterns':
     result = st.session_state.get("candle_pattern_quiz_result")
     if result:
         if result["passed"]:
-            st.success(f"You answered {result['score']}/{len(pattern_questions)} correctly and passed the pattern check.")
+            st.success(t("You answered {score}/{total} correctly and passed the pattern check.", score=result['score'], total=len(pattern_questions)))
         else:
-            st.warning(f"You answered {result['score']}/{len(pattern_questions)} correctly. Read the explanations and try again. Any earlier pass stays recorded.")
+            st.warning(t("You answered {score}/{total} correctly. Read the explanations and try again. Any earlier pass stays recorded.", score=result['score'], total=len(pattern_questions)))
         for qi, (question, options, correct_idx, explanation) in enumerate(pattern_questions):
             chosen_answer = result["answers"][qi]
-            with st.expander(f"{('✓' if chosen_answer == options[correct_idx] else '↻')} Question {qi + 1} explanation"):
-                st.markdown(f'**Correct answer:** {options[correct_idx]}\n\n{explanation}')
+            with st.expander(f"{('✓' if chosen_answer == options[correct_idx] else '↻')} {t('Question')} {qi + 1} {t('explanation')}"):
+                st.markdown(f'**{t("Correct answer")}:** {t(options[correct_idx])}\n\n{t(explanation)}')
     lesson_completion_button('Candlestick Patterns', "finish_candle_patterns")
-    st.markdown('[↑ Back to lesson top](#candle-pattern-top)', unsafe_allow_html=False)
+    st.markdown(t('[↑ Back to lesson top](#candle-pattern-top)'), unsafe_allow_html=False)
 
 
 # ============================================================
@@ -2395,11 +2390,11 @@ elif chosen_page == '02B Technical Indicators':
                     range_summary += 'The app has not identified a confirmed swing or supply/demand zone. These lines are reference levels, not guaranteed turning points or trade instructions.'
                     st.info(range_summary)
                 else:
-                    st.info('Fewer than 5 valid candles are available, so this reference cannot be drawn reliably.')
+                    st.info(t('Fewer than 5 valid candles are available, so this reference cannot be drawn reliably.'))
         else:
-            st.info('No data is available for this range. Try another range or check the data connection.')
+            st.info(t('No data is available for this range. Try another range or check the data connection.'))
     else:
-        st.info('No history is available right now. Check your connection and refresh, or continue with the lesson below.')
+        st.info(t('No history is available right now. Check your connection and refresh, or continue with the lesson below.'))
 
     # The explanation is directly below the chart and follows the single selected indicator.
     with st.container(border=True):
@@ -2426,7 +2421,7 @@ elif chosen_page == '02B Technical Indicators':
         else:
             render_technical_indicator_lesson(tech_indicator_choice)
 
-    with st.expander('Indicator groups | Ask a question, then choose a tool', expanded=False):
+    with st.expander(t('Indicator groups | Ask a question, then choose a tool'), expanded=False):
         map_cols = st.columns(4, gap="small")
         map_cards = [
             ("🧭", 'Trend and trend strength', "MA / EMA、ADX", 'Which way is the average price moving? Is a stronger trend developing?'),
@@ -2466,8 +2461,8 @@ elif chosen_page == '02B Technical Indicators':
     with st.form("technical_indicator_quiz_form"):
         tech_answers = []
         for qi, (question, options, correct_idx, explanation) in enumerate(tech_questions):
-            tech_answers.append(st.radio(f"{qi + 1}. {question}", options, index=None, key=f"technical_indicator_quiz_{qi}"))
-        tech_submit = st.form_submit_button('Submit chapter answers', width="stretch")
+            tech_answers.append(st.radio(f"{qi + 1}. {t(question)}", options, index=None, key=f"technical_indicator_quiz_{qi}", format_func=t))
+        tech_submit = st.form_submit_button(t('Submit chapter answers'), width="stretch")
     if tech_submit:
         if any(answer is None for answer in tech_answers):
             st.warning(f'There are {sum((answer is None for answer in tech_answers))} unanswered questions. Answer all of them before submitting.')
@@ -2484,8 +2479,8 @@ elif chosen_page == '02B Technical Indicators':
             st.warning(f"You answered {tech_result['score']}/{len(tech_questions)} correctly. Read the explanations and try again. Any earlier pass stays recorded.")
         for qi, (question, options, correct_idx, explanation) in enumerate(tech_questions):
             selected_answer = tech_result["answers"][qi]
-            with st.expander(f"{('✓' if selected_answer == options[correct_idx] else '↻')} Question {qi + 1} explanation"):
-                st.markdown(f'**Correct answer:** {options[correct_idx]}\n\n{explanation}')
+            with st.expander(f"{('✓' if selected_answer == options[correct_idx] else '↻')} {t('Question')} {qi + 1} {t('explanation')}"):
+                st.markdown(f'**{t("Correct answer")}:** {t(options[correct_idx])}\n\n{t(explanation)}')
 
     lesson_completion_button('Technical Indicators', "finish_technical_indicators")
 
@@ -2511,26 +2506,26 @@ elif chosen_page == '03 How Orders Work':
     order_types = ['Market order', 'Limit order', 'Stop order']
     selected_order = line_nav(order_types, key="order_types")
     if selected_order == 'Market order':
-        st.markdown("""
+        st.markdown(t("""
 A **market order** aims to buy or sell promptly at the best available market price. It puts more emphasis on execution than on a fixed price.
 
 **Remember:** The last traded price is not a promised fill price. Prices can move before execution, and a less liquid market may fill parts of an order at different prices.
-""")
+"""))
     elif selected_order == 'Limit order':
-        st.markdown("""
+        st.markdown(t("""
 A **limit order** sets the highest price you will pay to buy or the lowest price you will accept to sell.
 
 - A buy limit order can fill at the limit or lower, but may never fill.
 - A sell limit order can fill at the limit or higher, but may never fill either.
 
 Controlling price does not guarantee execution.
-""")
+"""))
     else:
-        st.markdown("""
+        st.markdown(t("""
 A **stop order** usually becomes a market order when its trigger condition is met. The actual fill can differ from the stop price.
 
 Some brokers offer **stop-limit orders**, which may remain unfilled in a fast market. Names, triggers and availability depend on the broker's rules.
-""")
+"""))
 
     section_heading("ACCOUNT BASICS", 'Cash accounts, margin accounts and fractional shares')
     ac1, ac2, ac3 = st.columns(3)
@@ -2547,28 +2542,28 @@ Some brokers offer **stop-limit orders**, which may remain unfilled in a fast ma
     ask_col.metric('Best ask', "$100.05")
     last_col.metric('Last traded price', "$100.00")
     st.markdown(escape_markdown_dollars('<div class="callout">Bid-ask spread = best ask − best bid = $0.10. The spread is one trading cost. Quotes can change, and execution also depends on available liquidity and the order queue.</div>'), unsafe_allow_html=True)
-    order_choice = st.radio('You want to buy 10 shares. What matters most?', [
+    order_choice = st.radio(t('You want to buy 10 shares. What matters most?'), [
         'Fill promptly, accepting that the price may change: a market order fits this aim',
         'Pay $99.90 or less: consider a buy limit order, which may not fill',
         'Any order can guarantee a fill at $100.00',
-    ], key="order_type_practice")
-    if st.button('Check the order exercise', key="order_type_submit"):
+    ], key="order_type_practice", format_func=t)
+    if st.button(t('Check the order exercise'), key="order_type_submit"):
         passed = order_choice.startswith('Fill promptly') or order_choice.startswith('Pay $99.90')
         record_quiz_attempt('How Orders Work', passed)
         if passed:
-            st.success('Correct: Order types involve different tradeoffs between price control and execution. Your aim, market conditions and broker rules matter.')
+            st.success(t('Correct: Order types involve different tradeoffs between price control and execution. Your aim, market conditions and broker rules matter.'))
             st.session_state["order_practice_passed"] = True
         else:
-            st.error('No common order guarantees the last traded price in all conditions. A market order has an uncertain price; a limit order may not fill.')
-    with st.expander('More details to understand before trading'):
-        st.markdown("""
+            st.error(t('No common order guarantees the last traded price in all conditions. A market order has an uncertain price; a limit order may not fill.'))
+    with st.expander(t('More details to understand before trading')):
+        st.markdown(t("""
 - **Quantity:** Whole shares, fractional shares and minimum order sizes depend on the security and broker.
 - **Time in force:** Day orders, Good-Till-Canceled and other choices depend on broker support.
 - **Trading sessions:** Outside regular hours, liquidity may be lower, spreads wider and price movements larger. Some order types are restricted. Exchange hours and holiday schedules vary.
 - **Costs:** Check commissions, spreads, trading or regulatory fees, currency conversion, fund expenses and applicable taxes. Costs vary by place, product and broker.
 - **Settlement:** A trade executing and the cash/securities settling are different events. Check the market, product and broker's settlement rules.
 - **Advanced trading:** Margin, short selling, options and leveraged products add mechanisms and risks. First understand ordinary cash purchases and sales.
-""")
+"""))
     st.markdown('<div class="warning-callout">This page does not connect to a broker or place real orders. For actual order choices, execution rules and fees, use your regulated broker’s current documents.</div>', unsafe_allow_html=True)
     lesson_completion_button('How Orders Work', "finish_trade_mechanics")
 
@@ -2582,8 +2577,8 @@ elif chosen_page == '04 Researching a Company':
         'Start with three financial statements: Is the company profitable? Is cash coming in? What does it own and owe?',
         "LESSON 04 · COMPANY RESEARCH LAB",
     )
-    st.markdown('**Start with a business question, then find financial evidence.**')
-    st.write('Use fictional Orange Grove Drinks to explore statements, ratios and case studies, then apply the method to a real company.')
+    st.markdown(t('**Start with a business question, then find financial evidence.**'))
+    st.write(t('Use fictional Orange Grove Drinks to explore statements, ratios and case studies, then apply the method to a real company.'))
 
     company_sections = [
         '01 · Financial Statements',
@@ -2597,7 +2592,7 @@ elif chosen_page == '04 Researching a Company':
     if lesson_section == '01 · Financial Statements':
         section_heading("THREE STATEMENTS · ONE STORY", 'Three statements answer three different questions', 'The Income statement covers profit over a period. The Balance sheet shows assets, liabilities and equity on a reporting date. The Cash flow statement tracks cash over a period. All examples use Orange Grove Drinks.')
         content_heading('Choose a statement')
-        st.markdown('Look at the chart first, then follow the calculations and questions.')
+        st.markdown(t('Look at the chart first, then follow the calculations and questions.'))
         statement_cards = [
             {"prefix": "①", "label": 'Income statement', "question": 'How much did it earn during the period?', "copy": 'Start with revenue and subtract direct costs, operating expenses, interest and taxes to understand gross profit, operating income and net income.', "value": '① Income statement'},
             {"prefix": "②", "label": 'Balance sheet', "question": 'What does it own and owe now?', "copy": 'Compare cash, receivables, inventory and equipment with liabilities and equity to understand financial position.', "value": '② Balance sheet'},
@@ -2622,7 +2617,7 @@ elif chosen_page == '04 Researching a Company':
                     args=(card["value"],),
                 )
         statement_mode = st.session_state.get("company_statement_choice", '① Income statement')
-        st.caption('Orange Grove Drinks is fictional. Amounts are in USD and simplified to explain statements and calculations.')
+        st.caption(t('Orange Grove Drinks is fictional. Amounts are in USD and simplified to explain statements and calculations.'))
         if statement_mode.startswith('① Income statement'):
             income_fig = go.Figure(go.Waterfall(
                 orientation="v",
@@ -2646,10 +2641,10 @@ elif chosen_page == '04 Researching a Company':
                 margin=dict(l=28, r=24, t=24, b=104), waterfallgap=0.28,
             )
             st.plotly_chart(income_fig, width="stretch", key="income_statement_waterfall")
-            st.caption('Items run across the bottom; amounts run up the side. Costs reduce the previous total. Subtotals show what remains. Hover over a bar to check its value.')
+            st.caption(t('Items run across the bottom; amounts run up the side. Costs reduce the previous total. Subtotals show what remains. Hover over a bar to check its value.'))
 
             content_heading('Read the Income statement step by step', level="h3")
-            st.markdown('**Revenue is the starting point.** Follow sales down through costs and expenses to profit. This chart shows accounting profit for a reporting period. Cash on hand, debt and whether a stock is attractively priced require other evidence.')
+            st.markdown(t('**Revenue is the starting point.** Follow sales down through costs and expenses to profit. This chart shows accounting profit for a reporting period. Cash on hand, debt and whether a stock is attractively priced require other evidence.'))
             income_steps = [
                 ('Step 1 | Revenue $10,000', "Customers' drink and snack purchases create $10,000 of sales. Making products, paying staff and running stores still cost money. For a real company, ask whether growth came from more sales, higher prices, acquisitions or currency changes, and check how revenue is recognized."),
                 ('Step 2 | Subtract direct costs of $4,000 → gross profit $6,000', 'Direct costs relate to providing the product: fruit, ingredients, cups and food in this example. $10,000 − $4,000 = $6,000. Gross margin = $6,000 ÷ $10,000 = 60%. Each $1 of sales leaves $0.60 after direct costs to cover other expenses and profit.'),
@@ -2660,10 +2655,10 @@ elif chosen_page == '04 Researching a Company':
                 st.markdown(escape_markdown_dollars(f"**{step_title}**\n\n{step_copy}"))
             st.markdown(escape_markdown_dollars('Results: gross profit $6,000 (60% gross margin); operating income $2,000 (20% operating margin); net income $1,500 (15% net margin). Each margin represents a different stage of cost deductions.'))
             content_heading('What should you ask next?', level="h3")
-            st.markdown("""- **Are margins improving?** Compare several quarters or years. Are costs growing faster than revenue?
+            st.markdown(t("""- **Are margins improving?** Compare several quarters or years. Are costs growing faster than revenue?
 - **Can growth continue?** Separate more sales, price increases and one-time effects. Read management discussion, segment data and notes.
-- **Did profit become cash?** Accrual accounting can record a credit sale before the customer pays. Compare the Cash flow statement.""")
-            st.markdown('Net income covers a specified period. Use the Balance sheet for cash balances and debt, the Cash flow statement for cash movements, and growth, risk and market prices when studying valuation.')
+- **Did profit become cash?** Accrual accounting can record a credit sale before the customer pays. Compare the Cash flow statement."""))
+            st.markdown(t('Net income covers a specified period. Use the Balance sheet for cash balances and debt, the Cash flow statement for cash movements, and growth, risk and market prices when studying valuation.'))
         elif statement_mode.startswith('② Balance sheet'):
             balance_df = pd.DataFrame({
                 'Item': ['Cash', 'Accounts receivable', 'Inventory', 'Equipment and other assets', 'Accounts payable', 'Short-term debt', 'Long-term debt', "Shareholders' equity"],
@@ -2686,18 +2681,18 @@ elif chosen_page == '04 Researching a Company':
                 showlegend=False, margin=dict(l=36, r=112, t=24, b=38), bargap=0.3,
             )
             st.plotly_chart(balance, width="stretch", key="balance_sheet_components")
-            st.caption('Green bars show assets; red bars show liabilities; blue shows equity. A longer horizontal bar means a larger amount.')
+            st.caption(t('Green bars show assets; red bars show liabilities; blue shows equity. A longer horizontal bar means a larger amount.'))
             st.markdown(escape_markdown_dollars('Assets $12,300 = liabilities $7,300 + equity $5,000'))
 
             content_heading('Read the Balance sheet step by step', level="h3")
-            st.markdown("**Think of a photograph taken on one date.** The Balance sheet shows what a company controls, what it owes and the owners' remaining book equity on the reporting date. These balances do not represent a whole year's earnings.")
+            st.markdown(t("**Think of a photograph taken on one date.** The Balance sheet shows what a company controls, what it owes and the owners' remaining book equity on the reporting date. These balances do not represent a whole year's earnings."))
             st.markdown(escape_markdown_dollars("**Step 1 | Assets: What resources does it control?** Total assets of $12,300 include cash $1,800, receivables $2,200, inventory $1,800, and equipment and other assets $6,500. Cash pays bills directly. Receivables await customers' payments and carry collection risk. Inventory must sell and can expire, break or need discounts. Equipment supports operations but is harder to turn into cash. Assets differ in liquidity and risk."))
             st.markdown(escape_markdown_dollars('**Step 2 | Liabilities: What obligations must it meet?** Accounts payable $1,800, short-term debt $1,500 and long-term debt $4,000 total $7,300. Payables usually await payment to suppliers. Short-term debt falls due sooner; long-term debt still requires interest and repayment. For real companies, inspect cash, due dates, rates, interest expense and the ability to generate cash.'))
             st.markdown(escape_markdown_dollars('**Step 3 | Equity $5,000:** Assets − liabilities = equity: $12,300 − $7,300 = $5,000. This is accounting book equity. Cash balance and stock market capitalization are different measures. Market capitalization is share price × shares outstanding.'))
             content_heading('Three areas to investigate', level="h3")
-            st.markdown("""- **Short-term payments:** Compare cash and current assets with upcoming obligations.
+            st.markdown(t("""- **Short-term payments:** Compare cash and current assets with upcoming obligations.
 - **Working capital quality:** Compare receivables and inventory with revenue over several years.
-- **Debt pressure:** Check rates, maturity dates and whether operating cash flow supports repayment.""")
+- **Debt pressure:** Check rates, maturity dates and whether operating cash flow supports repayment."""))
         else:
             cash_flow = pd.DataFrame({'Activity': ['Cash from operating activities', 'Cash from investing activities', 'Cash from financing activities', 'Net change in cash'], 'Cash flow (USD)': [900, -1500, 1000, 400]})
             cf_colors = ["#059669" if v >= 0 else "#ef4444" for v in cash_flow['Cash flow (USD)']]
@@ -2717,87 +2712,87 @@ elif chosen_page == '04 Researching a Company':
                 showlegend=False, margin=dict(l=42, r=112, t=24, b=38), bargap=0.32,
             )
             st.plotly_chart(cf_fig, width="stretch", key="cashflow_statement_bars")
-            st.caption('Green shows cash coming in; red shows cash going out. Blue marks the total net change. Right of zero means inflow; left means outflow.')
+            st.caption(t('Green shows cash coming in; red shows cash going out. Blue marks the total net change. Right of zero means inflow; left means outflow.'))
             st.markdown(escape_markdown_dollars('Net change in cash = $900 − $1,500 + $1,000 = +$400'))
 
             content_heading('Read the Cash flow statement step by step', level="h3")
-            st.markdown('**Profit and cash answer different questions.** Accounting can recognize revenue before payment and expenses before cash leaves. The Cash flow statement follows actual cash movements, helping show whether operations bring in cash and where it goes.')
+            st.markdown(t('**Profit and cash answer different questions.** Accounting can recognize revenue before payment and expenses before cash leaves. The Cash flow statement follows actual cash movements, helping show whether operations bring in cash and where it goes.'))
             st.markdown(escape_markdown_dollars('**Step 1 | Operating cash flow +$900:** Cash collected from customers minus payments to suppliers, staff, landlords and taxes leaves $900. Compare it with net income and several years of data to study cash generation.'))
             st.markdown(escape_markdown_dollars('**Step 2 | Investing cash flow −$1,500:** Investing includes equipment, store improvements, acquisitions and investment assets. This example has a $1,500 net outflow. Check the detail to see where it went, then track later revenue, profit and cash flow.'))
             st.markdown(escape_markdown_dollars('**Step 3 | Financing cash flow +$1,000:** Financing includes borrowing, debt repayment, share issuance and dividends. This $1,000 inflow could have different effects: borrowing adds repayment obligations; issuing shares can dilute existing owners.'))
             st.markdown(escape_markdown_dollars('**Step 4 | Net cash increase $400:** To find closing cash, start with opening cash and include other statement items, such as exchange-rate effects.'))
             content_heading('Four areas to investigate', level="h3")
-            st.markdown("""- **Operating cash trends:** Review several years and seasonal effects.
+            st.markdown(t("""- **Operating cash trends:** Review several years and seasonal effects.
 - **Profit versus cash:** Check receivables, inventory, payables and depreciation.
 - **Investment spending:** Identify equipment spending, acquisitions and other investments.
-- **Funding sources:** Distinguish operating cash, asset sales, borrowing and share issuance.""")
+- **Funding sources:** Distinguish operating cash, asset sales, borrowing and share issuance."""))
         content_heading('Connect the three statements')
-        st.markdown("""- **Income statement:** Revenue, costs, expenses and profit over a period.
+        st.markdown(t("""- **Income statement:** Revenue, costs, expenses and profit over a period.
 - **Balance sheet:** Assets, liabilities and equity on a reporting date.
 - **Cash flow statement:** Where cash came from and went during a period.
 
-Read them together. Receivables, inventory, depreciation, capital expenditures and financing link profit, financial position and cash movements.""")
+Read them together. Receivables, inventory, depreciation, capital expenditures and financing link profit, financial position and cash movements."""))
 
     # --- Tab 3: Metric translator with editable inputs ---
     elif lesson_section == '02 · Ratio Translator':
         section_heading("METRIC TRANSLATOR", 'Translate financial terms into everyday questions', 'Ask what the measure answers, then look at the formula. Choose a measure and change the example numbers to see the result.')
         metric_options = ['Revenue growth', 'Gross margin', 'Net margin', 'Earnings per share (EPS)', 'Price to earnings ratio (P/E)', 'Interest-bearing debt / equity', 'Operating cash flow / net income', 'Free cash flow (FCF)']
-        metric_choice = st.selectbox('Which measure would you like to explore?', metric_options, key="company_metric_translator")
+        metric_choice = st.selectbox(t('Which measure would you like to explore?'), metric_options, key="company_metric_translator", format_func=t)
         mleft, mright = st.columns([1, 1], gap="large")
         with mleft:
-            st.markdown('**Change the example numbers**')
+            st.markdown(t('**Change the example numbers**'))
             if metric_choice == 'Revenue growth':
-                old_value = st.number_input('Previous-period revenue (USD)', min_value=1.0, value=8000.0, step=500.0, key="metric_rev_old")
-                new_value = st.number_input('Current-period revenue (USD)', min_value=0.0, value=10000.0, step=500.0, key="metric_rev_new")
+                old_value = st.number_input(t('Previous-period revenue (USD)'), min_value=1.0, value=8000.0, step=500.0, key="metric_rev_old")
+                new_value = st.number_input(t('Current-period revenue (USD)'), min_value=0.0, value=10000.0, step=500.0, key="metric_rev_new")
                 metric_result = (new_value / old_value - 1) * 100 if old_value > 0 else np.nan
                 result_text = f"{metric_result:+.1f}%" if pd.notna(metric_result) else 'Cannot calculate'
                 formula = '(Current revenue − previous revenue) ÷ previous revenue × 100%'
                 example = f'(${new_value:,.0f} − ${old_value:,.0f})÷ ${old_value:,.0f} = {result_text}'
             elif metric_choice == 'Gross margin':
-                revenue = st.number_input('Revenue (USD)', min_value=1.0, value=10000.0, step=500.0, key="metric_gm_rev")
-                cogs = st.number_input('Direct costs (USD)', min_value=0.0, value=4000.0, step=250.0, key="metric_gm_cogs")
+                revenue = st.number_input(t('Revenue (USD)'), min_value=1.0, value=10000.0, step=500.0, key="metric_gm_rev")
+                cogs = st.number_input(t('Direct costs (USD)'), min_value=0.0, value=4000.0, step=250.0, key="metric_gm_cogs")
                 metric_result = (revenue - cogs) / revenue * 100
                 result_text = f"{metric_result:.1f}%"
                 formula = '(Revenue − direct costs) ÷ revenue × 100%'
                 example = f'(${revenue:,.0f} − ${cogs:,.0f})÷ ${revenue:,.0f} = {result_text}'
             elif metric_choice == 'Net margin':
-                revenue = st.number_input('Revenue (USD)', min_value=1.0, value=10000.0, step=500.0, key="metric_nm_rev")
-                net_income = st.number_input('Net income (USD)', value=1500.0, step=250.0, key="metric_nm_ni")
+                revenue = st.number_input(t('Revenue (USD)'), min_value=1.0, value=10000.0, step=500.0, key="metric_nm_rev")
+                net_income = st.number_input(t('Net income (USD)'), value=1500.0, step=250.0, key="metric_nm_ni")
                 metric_result = net_income / revenue * 100
                 result_text = f"{metric_result:.1f}%"
                 formula = 'Net income ÷ revenue × 100%'
                 example = f"${net_income:,.0f} ÷ ${revenue:,.0f} = {result_text}"
             elif metric_choice == 'Earnings per share (EPS)':
-                net_income = st.number_input('Net income attributable to common shareholders (USD)', min_value=-100000000.0, value=1500.0, step=250.0, key="metric_eps_ni")
-                shares = st.number_input('Weighted average common shares (example)', min_value=1.0, value=1000.0, step=100.0, key="metric_eps_shares")
+                net_income = st.number_input(t('Net income attributable to common shareholders (USD)'), min_value=-100000000.0, value=1500.0, step=250.0, key="metric_eps_ni")
+                shares = st.number_input(t('Weighted average common shares (example)'), min_value=1.0, value=1000.0, step=100.0, key="metric_eps_shares")
                 metric_result = net_income / shares
                 result_text = f'${metric_result:,.2f}/share'
                 formula = 'Net income attributable to common shareholders ÷ weighted average common shares'
                 example = f'${net_income:,.0f} ÷ {shares:,.0f} shares = {result_text}'
             elif metric_choice == 'Price to earnings ratio (P/E)':
-                price = st.number_input('Current share price (USD)', min_value=0.01, value=30.0, step=1.0, key="metric_pe_price")
-                eps = st.number_input('Earnings per share (USD)', value=1.5, step=0.25, key="metric_pe_eps")
+                price = st.number_input(t('Current share price (USD)'), min_value=0.01, value=30.0, step=1.0, key="metric_pe_price")
+                eps = st.number_input(t('Earnings per share (USD)'), value=1.5, step=0.25, key="metric_pe_eps")
                 metric_result = price / eps if eps > 0 else np.nan
                 result_text = f'{metric_result:.1f}×' if pd.notna(metric_result) else 'Zero or negative earnings: simple P/E not applicable'
                 formula = 'Share price ÷ EPS (check the earnings period and definition)'
                 example = f"${price:,.2f} ÷ ${eps:,.2f} = {result_text}" if eps > 0 else 'When EPS ≤ 0, ordinary P/E is generally unsuitable for direct comparisons.'
             elif metric_choice == 'Interest-bearing debt / equity':
-                debt = st.number_input('Short-term + long-term debt (USD)', min_value=0.0, value=5500.0, step=500.0, key="metric_debt")
-                equity = st.number_input("Shareholders' equity (USD)", min_value=-100000000.0, value=5000.0, step=500.0, key="metric_equity")
+                debt = st.number_input(t('Short-term + long-term debt (USD)'), min_value=0.0, value=5500.0, step=500.0, key="metric_debt")
+                equity = st.number_input(t("Shareholders' equity (USD)"), min_value=-100000000.0, value=5000.0, step=500.0, key="metric_equity")
                 metric_result = debt / equity if equity > 0 else np.nan
                 result_text = f'{metric_result:.2f}×' if pd.notna(metric_result) else 'Zero or negative equity: interpret with care'
                 formula = "Interest-bearing debt ÷ shareholders' equity"
                 example = f"${debt:,.0f} ÷ ${equity:,.0f} = {result_text}" if equity > 0 else 'With zero or negative equity, a simple multiple may lose its usual meaning.'
             elif metric_choice == 'Operating cash flow / net income':
-                cfo = st.number_input('Cash from operating activities (USD)', value=900.0, step=250.0, key="metric_cfo")
-                net_income = st.number_input('Net income (USD)', value=1500.0, step=250.0, key="metric_cfo_ni")
+                cfo = st.number_input(t('Cash from operating activities (USD)'), value=900.0, step=250.0, key="metric_cfo")
+                net_income = st.number_input(t('Net income (USD)'), value=1500.0, step=250.0, key="metric_cfo_ni")
                 metric_result = cfo / net_income if net_income != 0 else np.nan
                 result_text = f'{metric_result:.2f}×' if pd.notna(metric_result) else 'Net income is zero: cannot calculate'
                 formula = 'Operating cash flow ÷ net income'
                 example = f"${cfo:,.0f} ÷ ${net_income:,.0f} = {result_text}" if net_income != 0 else 'Cannot calculate when net income is zero.'
             else:
-                cfo = st.number_input('Cash from operating activities (USD)', value=900.0, step=250.0, key="metric_fcf_cfo")
-                capex = st.number_input('Capital expenditures (USD)', min_value=0.0, value=1200.0, step=250.0, key="metric_fcf_capex")
+                cfo = st.number_input(t('Cash from operating activities (USD)'), value=900.0, step=250.0, key="metric_fcf_cfo")
+                capex = st.number_input(t('Capital expenditures (USD)'), min_value=0.0, value=1200.0, step=250.0, key="metric_fcf_capex")
                 metric_result = cfo - capex
                 result_text = f"${metric_result:,.0f}"
                 formula = 'Simplified free cash flow = operating cash flow − capital expenditures'
@@ -2819,7 +2814,7 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
             st.markdown(f'**In everyday words:** {plain}')
             st.markdown(f'**Easy mistake:** {caution}')
             st.markdown(f'**Find more evidence:** {next_evidence}')
-        with st.expander('Quick review of other common measures'):
+        with st.expander(t('Quick review of other common measures')):
             quick_table = pd.DataFrame([
                 {'Measure': 'Revenue', 'Question it answers': 'How much did the company sell in goods or services?'},
                 {'Measure': 'Gross margin', 'Question it answers': 'What percentage of revenue remains after direct costs?'},
@@ -2833,7 +2828,7 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
     # --- Tab 4: Case-based reasoning, not rote definitions ---
     elif lesson_section == '03 · Company Detective':
         section_heading("CASE INVESTIGATION", 'When numbers disagree, investigate before deciding', 'Real company data often gives mixed signals. Your first job is to find the next useful piece of evidence.')
-        st.caption('These are three separate fictional scenarios for Orange Grove Drinks, not facts from the same reporting period.')
+        st.caption(t('These are three separate fictional scenarios for Orange Grove Drinks, not facts from the same reporting period.'))
         cases = {
             'Case A · Revenue rises, operating cash flow falls': {
                 "story": 'Revenue rises 25% and net income rises 10% year over year, but operating cash flow falls 30%. Receivables and inventory both rise sharply.',
@@ -2857,38 +2852,38 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
                 "answer": 'EPS = relevant net income ÷ weighted average shares. Fewer shares can lift EPS without much total profit growth. Investigate buyback costs, cash flow and business performance.',
             },
         }
-        case_name = st.selectbox('Choose a case to investigate', list(cases.keys()), key="company_investigation_case")
+        case_name = st.selectbox(t('Choose a case to investigate'), list(cases.keys()), key="company_investigation_case", format_func=t)
         case = cases[case_name]
         # Each case has different answer choices. Clear a stale answer before
         # constructing the radio widget so a previous case's option cannot linger.
         if st.session_state.get("company_case_answer") not in case["options"]:
             st.session_state["company_case_answer"] = case["options"][0]
         st.markdown(f"**{case_name}**")
-        st.write(case["story"])
-        case_answer = st.radio(case["question"], case["options"], key="company_case_answer")
-        if st.button('Submit and review the evidence', key="company_case_submit"):
+        st.write(t(case["story"]))
+        case_answer = st.radio(t(case["question"]), case["options"], key="company_case_answer", format_func=t)
+        if st.button(t('Submit and review the evidence'), key="company_case_submit"):
             passed = case_answer == case["options"][case["correct"]]
             st.session_state["company_case_last"] = {"case": case_name, "passed": passed, "answer": case_answer}
             record_quiz_attempt('Researching a Company', passed)
         last_case_result = st.session_state.get("company_case_last", {})
         if last_case_result.get("case") == case_name:
             if last_case_result.get("passed"):
-                st.success('Good reasoning. You chose to gather evidence before drawing a trading conclusion from one number.')
+                st.success(t('Good reasoning. You chose to gather evidence before drawing a trading conclusion from one number.'))
             else:
-                st.error('Look again at the conflicting signals and try another answer.')
+                st.error(t('Look again at the conflicting signals and try another answer.'))
             st.markdown(f"**Explanation:** {case['answer']}")
-        with st.expander('Hint: What does evidence first mean?'):
-            st.write('When numbers disagree, seek time series, statement notes, management discussion, industry comparisons and cash flow explanations. Write down what remains unknown.')
+        with st.expander(t('Hint: What does evidence first mean?')):
+            st.write(t('When numbers disagree, seek time series, statement notes, management discussion, industry comparisons and cash flow explanations. Write down what remains unknown.'))
 
     # --- Tab 5: apply framework to real data without pretending all fields are available ---
     elif lesson_section == '04 · Research a Real Company':
         section_heading("APPLY TO A REAL COMPANY", 'Apply the method to a real company', 'Start with official filings. Data summaries can help locate numbers, but do not cover everything.')
         stock_symbols = [s for s in TICKERS.keys() if s not in {"SPY", "QQQ", "EFA", "EEM", "EWJ", "FXI"}]
         real_symbol = st.selectbox(t('Choose a company'), stock_symbols, format_func=ticker_label, key=lang_key("company_real_lookup_symbol"))
-        st.markdown('**Start with official filings.** Find US company disclosures through SEC EDGAR on the Data & Methods page.')
-        st.caption("Start with the 10-K annual report and 10-Q quarterly report: business description, risk factors, Management's Discussion and Analysis (MD&A), and the three financial statements. Investor Relations pages can help; check filing and announcement dates.")
-        if st.button('Try loading a company summary from the data service', key="company_fetch_yahoo_info"):
-            with st.spinner('Loading the public company summary; some fields may be missing…'):
+        st.markdown(t('**Start with official filings.** Find US company disclosures through SEC EDGAR on the Data & Methods page.'))
+        st.caption(t("Start with the 10-K annual report and 10-Q quarterly report: business description, risk factors, Management's Discussion and Analysis (MD&A), and the three financial statements. Investor Relations pages can help; check filing and announcement dates."))
+        if st.button(t('Try loading a company summary from the data service'), key="company_fetch_yahoo_info"):
+            with st.spinner(t('Loading the public company summary; some fields may be missing…')):
                 try:
                     raw_info = yf.Ticker(real_symbol).get_info()
                     if not isinstance(raw_info, dict):
@@ -2899,7 +2894,7 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
         lookup = st.session_state.get("company_lookup_cache", {})
         if lookup.get("symbol") == real_symbol:
             if lookup.get("error"):
-                st.warning('The company summary is unavailable. You can still use the teaching examples above and verify real data through SEC EDGAR.')
+                st.warning(t('The company summary is unavailable. You can still use the teaching examples above and verify real data through SEC EDGAR.'))
             elif lookup.get("info"):
                 raw_info = lookup["info"]
                 def _fmt_company_number(value, kind="money"):
@@ -2936,8 +2931,8 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
                 if rows:
                     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
                 else:
-                    st.info('No company summary fields were returned. Use official filings.')
-                st.caption("Definitions and update times may differ. Verify key figures against the company's latest filings.")
+                    st.info(t('No company summary fields were returned. Use official filings.'))
+                st.caption(t("Definitions and update times may differ. Verify key figures against the company's latest filings."))
                 if raw_info.get("website"):
                     website = str(raw_info.get("website"))
                     if website.startswith("https://") or website.startswith("http://"):
@@ -2959,19 +2954,19 @@ Read them together. Receivables, inventory, depreciation, capital expenditures a
                     checked_count += 1
         st.progress(checked_count / len(checklist_items), text=f'Research checklist: {checked_count}/{len(checklist_items)} items')
         content_heading('Write your research conclusion')
-        research_note = st.text_area('Use three sentences: What do I know? What must I verify? What is the biggest uncertainty?', key="company_research_note", height=110, placeholder='The company earns money by… Current data shows… I still need to verify…')
-        if st.button('Save research notes', key="company_research_save_note"):
+        research_note = st.text_area(t('Use three sentences: What do I know? What must I verify? What is the biggest uncertainty?'), key="company_research_note", height=110, placeholder='The company earns money by… Current data shows… I still need to verify…')
+        if st.button(t('Save research notes'), key="company_research_save_note"):
             if not research_note.strip():
-                st.warning('Write at least one sentence of your own conclusion first.')
+                st.warning(t('Write at least one sentence of your own conclusion first.'))
             else:
                 st.session_state["company_research_saved_note"] = research_note.strip()
-                st.success('Saved for this session. You can return later; restarting the app may reset it.')
+                st.success(t('Saved for this session. You can return later; restarting the app may reset it.'))
         if st.session_state.get("company_research_saved_note"):
-            with st.expander('View saved research notes'):
+            with st.expander(t('View saved research notes')):
                 st.write(st.session_state["company_research_saved_note"])
 
     st.markdown("---")
-    st.caption('These example numbers are fictional teaching data.')
+    st.caption(t('These example numbers are fictional teaching data.'))
     lesson_completion_button('Researching a Company', "finish_company_research")
 
 
@@ -2997,35 +2992,35 @@ elif chosen_page == '05 Why Stock Prices Move':
     st.write("")
     section_heading("CASE PRACTICE", 'Case study | Why might a stock fall after good earnings?', 'This is a fictional teaching scenario.')
     st.markdown('<div class="lesson-card"><div class="lesson-title">The situation</div><div class="lesson-text">A technology company reports quarterly profit growth of 20%. Analysts had expected 30%, and the company lowers next quarter’s sales guidance.</div></div>', unsafe_allow_html=True)
-    case_answer = st.radio('Which explanation makes most sense?', [
+    case_answer = st.radio(t('Which explanation makes most sense?'), [
         'Profit growth must raise the price, so the market reaction makes no sense',
         'Investors may focus on the missed expectation and weaker future guidance',
         'Higher daily volume proves the price must fall',
-    ], key="factor_case")
-    if st.button('Review the case', key="factor_submit"):
+    ], key="factor_case", format_func=t)
+    if st.button(t('Review the case'), key="factor_submit"):
         passed = case_answer.startswith('Investors may')
         record_quiz_attempt('Why Stock Prices Move', passed)
         if passed:
-            st.success('Correct. Markets compare results with earlier expectations. The gap often helps explain a short-term reaction.')
+            st.success(t('Correct. Markets compare results with earlier expectations. The gap often helps explain a short-term reaction.'))
         else:
-            st.error('20% growth is the reported result. Investors also compare what they expected and assess the future outlook.')
-    with st.expander('Investigate price changes at four levels'):
-        st.markdown("""
+            st.error(t('20% growth is the reported result. Investors also compare what they expected and assess the future outlook.'))
+    with st.expander(t('Investigate price changes at four levels')):
+        st.markdown(t("""
 1. **Company:** Sales, pricing, costs, management, products, competitors, earnings and guidance.
 2. **Industry:** Supply/demand, new technology, supply chains, regulation and cycles.
 3. **Economy:** Rates, inflation, jobs, growth, currencies and policy.
 4. **Market:** Expectations, risk appetite, fund flows, liquidity and valuations.
 
 One event may affect several levels and may already be expected. Record event dates, original sources, price changes and alternative explanations. Avoid selecting only supporting evidence after the fact.
-""")
-    with st.expander('Fundamental analysis and technical analysis'):
-        st.markdown("""
+"""))
+    with st.expander(t('Fundamental analysis and technical analysis')):
+        st.markdown(t("""
 - **Fundamental analysis:** Studies the business, financial statements, competition, management, valuation and external conditions to understand the business and market price.
 - **Technical analysis:** Studies prices, volume and indicators for historical patterns. A pattern may not repeat or establish a future direction.
 - **Limits:** Expectations may already be reflected in prices; accounting definitions differ; charts contain noise. Neither method guarantees a result.
 - **Timing:** Entry price, holding period, costs and investor behavior affect returns even when a longer-term idea seems reasonable.
-""")
-    st.markdown('**Verify the data:** Compare prices and volume with official filings, announcement dates and economic data for the same period. Sources are collected on Data & Methods.')
+"""))
+    st.markdown(t('**Verify the data:** Compare prices and volume with official filings, announcement dates and economic data for the same period. Sources are collected on Data & Methods.'))
     st.markdown('<div class="warning-callout">Build a useful habit: describe what the data shows, then seek evidence for an explanation. One event happening before another does not prove it caused it.</div>', unsafe_allow_html=True)
     lesson_completion_button('Why Stock Prices Move', "finish_factors")
 
@@ -3070,9 +3065,9 @@ elif chosen_page == '06 Risk & Investor Protection':
     checked_count = sum(checks)
     st.progress(checked_count / len(check_items), text=f'You completed {checked_count}/{len(check_items)} self-check items')
     if checked_count < len(check_items):
-        st.caption('Use this checklist to review risk recognition. Return to the relevant lesson for any unclear item.')
+        st.caption(t('Use this checklist to review risk recognition. Return to the relevant lesson for any unclear item.'))
     else:
-        st.success('All items reviewed. For a real investment, verify the security, local rules and your personal circumstances again.')
+        st.success(t('All items reviewed. For a real investment, verify the security, local rules and your personal circumstances again.'))
 
     section_heading("RED FLAGS", 'Warning signs to recognize')
     red_cols = st.columns(2)
@@ -3083,8 +3078,8 @@ elif chosen_page == '06 Risk & Investor Protection':
         info_card("🚩", 'Social-media stock groups and fake experts', 'Strangers may impersonate professionals, brokers or regulators, or promote prices before selling. Group chats, screenshots and celebrity pictures are not verification.')
         info_card("🚩", 'Pay first to withdraw or recover losses', 'Unfreezing fees and recovery fees may be another scam. Do not send further funds or sensitive information to the requester.')
 
-    with st.expander('Account security and common thinking traps'):
-        st.markdown("""
+    with st.expander(t('Account security and common thinking traps')):
+        st.markdown(t("""
 **Account security**
 - Use official broker websites or apps rather than sign-in links in unfamiliar messages.
 - Enable multi-factor authentication where supported. Use a strong, unique password. Keep passwords, one-time codes and recovery codes private.
@@ -3099,26 +3094,26 @@ elif chosen_page == '06 Risk & Investor Protection':
 - **Sunk costs:** Continuing an unsupported decision because you already spent time or money on it.
 
 Before investing, record your reasons, main risks, verification sources and when to reassess.
-""")
-    with st.expander('Advanced tools to recognize before considering them'):
-        st.markdown("""
+"""))
+    with st.expander(t('Advanced tools to recognize before considering them')):
+        st.markdown(t("""
 - **Margin / leverage:** Borrowing or derivatives can magnify losses and lead to margin calls or forced sales.
 - **Short selling:** Borrow securities to sell, then buy them back to return. Rising prices can create very large losses; the process is more complex than an ordinary purchase.
 - **Options:** Values depend on the underlying price, time, volatility and more. Risks differ by strategy; some selling strategies have extremely high or theoretically unlimited losses.
 - **Leveraged / inverse ETFs:** Targets usually apply to a specified daily multiple or inverse return. Daily resets and compounding can make longer-term results differ from a simple multiple.
 
 You do not need to master these tools now. Learn their added complexity and risk before considering their use.
-""")
+"""))
 
-    scam_answer = st.radio('A social-media group promises high monthly profits and asks you to transfer money today for an inside stock list. What is the careful response?', [
-        'Transfer quickly to avoid missing out', 'Pause and independently verify the organization and sources', 'Send a little first, then add more after the guaranteed profit'], key="scam_practice")
-    if st.button('Check your scam awareness', key="scam_submit"):
+    scam_answer = st.radio(t('A social-media group promises high monthly profits and asks you to transfer money today for an inside stock list. What is the careful response?'), [
+        'Transfer quickly to avoid missing out', 'Pause and independently verify the organization and sources', 'Send a little first, then add more after the guaranteed profit'], key="scam_practice", format_func=t)
+    if st.button(t('Check your scam awareness'), key="scam_submit"):
         passed = scam_answer.startswith('Pause')
         record_quiz_attempt('Risk & Investor Protection', passed)
         if passed:
-            st.success('Correct. Guaranteed returns and pressure to transfer are warning signs. Verify independently and protect your personal and account information.')
+            st.success(t('Correct. Guaranteed returns and pressure to transfer are warning signs. Verify independently and protect your personal and account information.'))
         else:
-            st.error("Guaranteed returns and urgency deserve caution. A chat group's recommendation is not a reason to transfer funds or trade.")
+            st.error(t("Guaranteed returns and urgency deserve caution. A chat group's recommendation is not a reason to transfer funds or trade."))
     lesson_completion_button('Risk & Investor Protection', "finish_investor_protection")
 
 
@@ -3240,10 +3235,10 @@ elif chosen_page == 'Final Quiz':
         answers: list[int | None] = []
         for i, q in enumerate(questions):
             st.markdown(f'<div class="section-kicker">QUESTION {i+1:02d} / {len(questions):02d} · {escape(q[4])}</div><div style="font-size:1.02rem;font-weight:750;color:#131722;margin:.25rem 0 .7rem">{escape(q[0])}</div>', unsafe_allow_html=True)
-            answer = st.radio('Choose an answer', q[1], key=f"comprehensive_answer_{i}", index=None, label_visibility="collapsed")
+            answer = st.radio(t('Choose an answer'), q[1], key=f"comprehensive_answer_{i}", index=None, label_visibility="collapsed", format_func=t)
             answers.append(q[1].index(answer) if answer is not None else None)
             st.markdown("<hr style='margin:.8rem 0 1.2rem'>", unsafe_allow_html=True)
-        submitted = st.form_submit_button('Submit quiz and view each result', width="stretch")
+        submitted = st.form_submit_button(t('Submit quiz and view each result'), width="stretch")
     if submitted:
         if any(answer is None for answer in answers):
             st.warning(f'There are {sum((answer is None for answer in answers))} questions are unanswered. Complete all 24 before submitting.')
@@ -3255,18 +3250,18 @@ elif chosen_page == 'Final Quiz':
     if result:
         score = result["score"]
         required_score = 20  # At least 80% of 24 questions, rounded up.
-        st.metric('Your score', f"{score}/{len(questions)}", f"{score / len(questions) * 100:.0f}%")
+        st.metric(t('Your score'), f"{score}/{len(questions)}", f"{score / len(questions) * 100:.0f}%")
         if score >= required_score:
-            st.success('Passed! You reached the 80% threshold. Keep applying the concepts to real evidence; a quiz pass does not establish forecasting skill.')
-            if st.button('✓ Complete Final Quiz', key="comprehensive_quiz_complete"):
+            st.success(t('Passed! You reached the 80% threshold. Keep applying the concepts to real evidence; a quiz pass does not establish forecasting skill.'))
+            if st.button(t('✓ Complete Final Quiz'), key="comprehensive_quiz_complete"):
                 mark_complete('Final Quiz')
-                st.success('Quiz completion recorded.')
+                st.success(t('Quiz completion recorded.'))
         else:
             st.info(f'You have not yet reached {required_score}/{len(questions)} points. Review the lessons linked to incorrect answers, then try again.')
         content_heading('Your results | Green = correct; red = incorrect', level="h3")
         for i, q in enumerate(questions):
             render_final_answer_review(i + 1, q[0], q[1], int(result["answers"][i]), q[2], q[3], q[4])
-        st.button('Restart the 24-question quiz', key="comprehensive_quiz_retry", on_click=reset_comprehensive_quiz)
+        st.button(t('Restart the 24-question quiz'), key="comprehensive_quiz_retry", on_click=reset_comprehensive_quiz)
 
 # ============================================================
 # Data and methodology
@@ -3280,7 +3275,7 @@ elif chosen_page == 'Data & Methods':
         info_card("🧮", 'Measure definitions', 'Period return uses the first and last valid closes. Annualized volatility approximates daily-return standard deviation × √252. Maximum drawdown is the largest decline from an earlier peak.', 'Checkable calculations')
 
     section_heading("CURRICULUM SCOPE", 'What does the course cover?')
-    st.markdown("""
+    st.markdown(t("""
 The beginner path covers:
 
 1. Stocks, bonds, indices, ETFs, dividends, market capitalization, exchanges and brokers.
@@ -3293,10 +3288,10 @@ The beginner path covers:
 8. Investor protection, social-media scams, account security, thinking traps and advanced-product risks.
 
 **Scope:** Introductory stock investing. Consult official documents for local taxes, trading rules and product terms. Short selling, margin, options, futures and leveraged products are introduced only at a basic risk-awareness level.
-""")
+"""))
 
     section_heading("DATA SOURCE", 'Sources and use limitations')
-    st.markdown("""
+    st.markdown(t("""
 - **Market data:** The third-party Python package `yfinance` retrieves Yahoo Finance historical data.
 - **Data rights:** Availability for download does not establish permission for public redistribution. `yfinance` is not an officially endorsed Yahoo open API.
 - **Course submissions:** If an assignment requires an open API or verifiable open dataset, confirm that this source qualifies or choose a source with clear licensing.
@@ -3304,9 +3299,9 @@ The beginner path covers:
 - **Candlestick examples:** The pattern gallery uses synthetic OHLC to show structure. The Learning Home price challenge and real-market lab use historical OHLCV. The price challenge selects a historical sample with nearby SMA and MACD crossovers, hides its next 20 trading days, and reveals them after submission. The selected symbol, dates and source appear beside the exercise. Pattern names and definitions can vary and do not establish predictions.
 - **Earnings example:** Learning Home uses NVIDIA's November 20, 2024 announcement of fiscal Q3 2025 results, with the announcement linked on the page, to explore expectations and price reactions.
 - **Trading:** Educational exploration only; there is no broker connection or real order submission.
-""")
-    with st.expander('Teaching structure and further learning'):
-        st.markdown("""
+"""))
+    with st.expander(t('Teaching structure and further learning')):
+        st.markdown(t("""
 The project takes inspiration from the public structure of IBKR Campus / Traders' Academy, without copying its lesson content:
 - Start with stocks and ETFs, then explore market structure, research, risk and practice.
 - Combine concepts, examples, interactive exploration and knowledge checks.
@@ -3317,19 +3312,19 @@ The explanations and examples are independently written and do not represent IBK
 **IBKR references:** [Course directory](https://www.interactivebrokers.com/campus/traders-academy/finance-courses/) · [Introduction to Stocks](https://www.interactivebrokers.com/campus/trading-course/intro-to-stocks/) · [Progress and quizzes](https://www.interactivebrokers.com/campus/about-academy-quizzes/)
 
 **TradingView terminology:** [Candlesticks](https://www.tradingview.com/support/solutions/43000745269-introduction-to-candlestick-charts-and-patterns/) · [Technical indicators](https://www.tradingview.com/support/solutions/43000614331-technical-ratings/) · [Financial statements](https://www.tradingview.com/support/solutions/43000543506-how-to-access-financial-data-on-tradingview/)
-""")
-    with st.expander('Official resources and verification'):
-        st.markdown("""
+"""))
+    with st.expander(t('Official resources and verification')):
+        st.markdown(t("""
 - [Investor.gov: Investing basics, risk, compounding and diversification](https://www.investor.gov/introduction-investing)
 - [Investor.gov: Order types](https://www.investor.gov/introduction-investing/investing-basics/how-stock-markets-work/types-orders)
 - [Investor.gov: Common scams](https://www.investor.gov/additional-resources/spotlight/common-scams)
 - [SEC EDGAR: Public company filings](https://www.sec.gov/edgar/search/)
 
 These resources primarily address the US. Broker authorization, taxes, trading, settlement and investor protection vary elsewhere. Check your local regulator and broker's documents.
-""")
+"""))
     method_period = st.selectbox(t('Create a downloadable dataset'), list(PERIODS.keys()), index=4, format_func=lambda x: t(PERIODS[x]), key=lang_key("method_period"))
     method_symbols = st.multiselect(t('Choose symbols'), list(TICKERS.keys()), default=["AAPL", "MSFT", "NVDA", "SPY", "QQQ"], format_func=ticker_label, key=lang_key("method_symbols"))
-    if st.button('Load and clean data', key="method_fetch"):
+    if st.button(t('Load and clean data'), key="method_fetch"):
         method_data, method_error = safe_prices(method_symbols, method_period)
         st.session_state["method_data"] = method_data
         st.session_state["method_error"] = method_error
@@ -3342,13 +3337,13 @@ These resources primarily address the US. Broker authorization, taxes, trading, 
         s2.metric('Securities', f"{method_data['ticker'].nunique()}")
         s3.metric('Fields', f"{method_data.shape[1]}")
         st.dataframe(method_data.head(30), width="stretch", hide_index=True)
-        st.download_button('Download cleaned CSV', method_data.to_csv(index=False).encode("utf-8-sig"), file_name="stockscope_cleaned_daily_prices.csv", mime="text/csv")
+        st.download_button(t('Download cleaned CSV'), method_data.to_csv(index=False).encode("utf-8-sig"), file_name="stockscope_cleaned_daily_prices.csv", mime="text/csv")
 
 
 # Footer
 if not _EMBEDDED:
     st.markdown("---")
-    st.caption('StockScope Learn · Introductory investing course prototype. Historical data may be delayed, missing or revised; past performance does not predict future results. Check data-use and redistribution rights before public release.')
+    st.caption(t('StockScope Learn · Introductory investing course prototype. Historical data may be delayed, missing or revised; past performance does not predict future results. Check data-use and redistribution rights before public release.'))
 
 # Auto-scroll is deliberately reserved for a real main-navigation change.
 # Changing the selected candle pattern never triggers a scroll-to-top action.
