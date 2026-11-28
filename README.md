@@ -46,7 +46,7 @@ python -m streamlit run app.py
 
 On Windows you can also double-click `dashboard/start_windows.bat`.
 
-Open **http://localhost:8501**. Needs Python 3.11+ and internet (`yfinance`).
+Open **http://localhost:8501**. Needs Python 3.12+ and internet (`yfinance`).
 
 ## Integrated learning
 
@@ -67,7 +67,7 @@ The source learning folder is preserved separately. `learn/app.py` remains avail
 
 ## Development checks
 
-From the repository root, with a Python 3.11+ virtual environment active:
+From the repository root, with a Python 3.12+ virtual environment active:
 
 ```bash
 python -m pip install -r requirements-dev.txt
@@ -79,3 +79,24 @@ python -m compileall -q dashboard learn tests
 Tests mock Yahoo Finance and do not require network access. They cover navigation, chart ranges/types, watchlist selection handling, missing/duplicate data, market outages, technical indicators, financial lesson controls, and quiz submission/retry flows.
 
 `dashboard/test_intraday.py` remains a manual network diagnostic; run it directly with Python when investigating the live feed.
+
+## Public deployment
+
+Deploy the combined application on Streamlit Community Cloud using:
+
+- Repository: `marcowan829-lgtm/StockScope`
+- Branch: `codex/public-hosting`
+- Main file path: `dashboard/app.py`
+- Python version: `3.12`
+- App visibility: public
+
+The dependency file is `dashboard/requirements.txt`. The root
+`.streamlit/config.toml` preserves the dashboard theme when Cloud launches
+from the repository root. The original dashboard configuration remains for
+local launches from `dashboard/`. No application secrets are required.
+
+To reproduce the Cloud working directory locally, run from the repository root:
+
+```bash
+python -m streamlit run dashboard/app.py
+```
